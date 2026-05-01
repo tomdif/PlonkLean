@@ -148,5 +148,59 @@ theorem neg_add_cancel' (p : EdwardsPoint F a d) :
     rw [div_eq_one_iff_eq hDY]
     linear_combination hxy
 
+
+/-! ## Associativity (raw polynomial form on F × F)
+
+Given three on-curve points and non-zero inner denominators, the addition law
+satisfies the polynomial cross-multiplication identities for X and Y. -/
+
+/-- Cross-multiplication identity for X-associativity. -/
+theorem addPoint_assoc_polyX (a d x₁ y₁ x₂ y₂ x₃ y₃ : F)
+    (hp1 : a * x₁^2 + y₁^2 = 1 + d * x₁^2 * y₁^2)
+    (hp2 : a * x₂^2 + y₂^2 = 1 + d * x₂^2 * y₂^2)
+    (hp3 : a * x₃^2 + y₃^2 = 1 + d * x₃^2 * y₃^2) :
+    let nx12 := x₁ * y₂ + y₁ * x₂
+    let dx12 := 1 + d * x₁ * x₂ * y₁ * y₂
+    let ny12 := y₁ * y₂ - a * x₁ * x₂
+    let dy12 := 1 - d * x₁ * x₂ * y₁ * y₂
+    let nx23 := x₂ * y₃ + y₂ * x₃
+    let dx23 := 1 + d * x₂ * x₃ * y₂ * y₃
+    let ny23 := y₂ * y₃ - a * x₂ * x₃
+    let dy23 := 1 - d * x₂ * x₃ * y₂ * y₃
+    (nx12 * dy12 * y₃ + ny12 * dx12 * x₃) *
+        (dx23 * dy23 + d * x₁ * y₁ * nx23 * ny23) =
+      (x₁ * ny23 * dx23 + y₁ * nx23 * dy23) *
+        (dx12 * dy12 + d * nx12 * ny12 * x₃ * y₃) := by
+  intro nx12 dx12 ny12 dy12 nx23 dx23 ny23 dy23
+  simp only [nx12, dx12, ny12, dy12, nx23, dx23, ny23, dy23]
+  linear_combination
+      (-a^2*d*x₁*x₂^4*x₃^2*y₂*y₃ - a^2*d*x₁*x₂^3*x₃^3*y₂^2 + a*d^2*x₁*x₂^4*x₃^2*y₂^3*y₃ + a*d*x₁*x₂^3*x₃*y₂^2 - a*d*x₂^4*x₃*y₁*y₂*y₃^2 + a*d*x₂^2*x₃^3*y₁*y₂^3 - d^2*x₁*x₂^3*x₃*y₂^4*y₃^2 + d^2*x₂^4*x₃*y₁*y₂^3*y₃^2 + d^2*x₂^3*x₃^2*y₁*y₂^4*y₃ + d*x₁*x₂^2*y₂^3*y₃^3 - d*x₁*x₂^2*y₂^3*y₃ + d*x₁*x₂*x₃*y₂^4*y₃^2 + d*x₂^3*y₁*y₂^2*y₃^3 - d*x₂^3*y₁*y₂^2*y₃ - d*x₂^2*x₃*y₁*y₂^3 - d*x₂*x₃^2*y₁*y₂^4*y₃) * hp1
+    + (-a^3*x₁^3*x₂*x₃^3 + a^2*d*x₁^3*x₂^2*x₃^2*y₂*y₃ + a^2*d*x₁^3*x₂*x₃^3*y₃^2 - a^2*x₁^3*x₂*x₃*y₃^2 + a^2*x₁^3*x₂*x₃ + a^2*x₁^3*x₃^2*y₂*y₃ + a^2*x₁^2*x₂*x₃^2*y₁*y₃ + a^2*x₁^2*x₃^3*y₁*y₂ - a^2*x₁*x₂*x₃^3*y₁^2 + a^2*x₁*x₂*x₃^3 - a*d^2*x₁^2*x₂^2*x₃^3*y₁*y₂*y₃^2 - a*d*x₁^3*x₂*x₃*y₂^2*y₃^2 - a*d*x₁^3*x₃^2*y₂*y₃^3 + a*d*x₁^2*x₂^2*x₃*y₁*y₂*y₃^2 + a*d*x₁^2*x₂*x₃^2*y₁*y₂^2*y₃ - a*d*x₁^2*x₂*x₃^2*y₁*y₃^3 - a*d*x₁^2*x₃^3*y₁*y₂*y₃^2 + a*d*x₁*x₂^2*x₃^2*y₁^2*y₂*y₃ - a*d*x₁*x₂^2*x₃^2*y₂*y₃ + a*d*x₁*x₂*x₃^3*y₁^2*y₃^2 - a*d*x₁*x₂*x₃^3*y₃^2 + a*x₁^3*y₂*y₃^3 - a*x₁^3*y₂*y₃ + a*x₁^2*x₂*y₁*y₃^3 - a*x₁^2*x₂*y₁*y₃ + a*x₁^2*x₃*y₁*y₂*y₃^2 - a*x₁^2*x₃*y₁*y₂ - a*x₁*x₂*x₃*y₁^2*y₃^2 + a*x₁*x₂*x₃*y₁^2 + a*x₁*x₂*x₃*y₃^2 - a*x₁*x₂*x₃ + a*x₁*x₃^2*y₁^2*y₂*y₃ - a*x₁*x₃^2*y₂*y₃ + a*x₂*x₃^2*y₁^3*y₃ - a*x₂*x₃^2*y₁*y₃ + a*x₃^3*y₁^3*y₂ - a*x₃^3*y₁*y₂ - d^2*x₁^2*x₂*x₃^2*y₁*y₂^2*y₃^3 - d^2*x₁*x₂^2*x₃^2*y₁^2*y₂*y₃^3 + d^2*x₁*x₂*x₃^3*y₁^2*y₂^2*y₃^2 - d*x₁*x₂*x₃*y₁^2*y₂^2*y₃^2 + d*x₁*x₂*x₃*y₂^2*y₃^2 - d*x₁*x₃^2*y₁^2*y₂*y₃^3 + d*x₁*x₃^2*y₂*y₃^3 + d*x₂^2*x₃*y₁^3*y₂*y₃^2 - d*x₂^2*x₃*y₁*y₂*y₃^2 + d*x₂*x₃^2*y₁^3*y₂^2*y₃ - d*x₂*x₃^2*y₁^3*y₃^3 - d*x₂*x₃^2*y₁*y₂^2*y₃ + d*x₂*x₃^2*y₁*y₃^3 - d*x₃^3*y₁^3*y₂*y₃^2 + d*x₃^3*y₁*y₂*y₃^2 + x₁*y₁^2*y₂*y₃^3 - x₁*y₁^2*y₂*y₃ - x₁*y₂*y₃^3 + x₁*y₂*y₃ + x₂*y₁^3*y₃^3 - x₂*y₁^3*y₃ - x₂*y₁*y₃^3 + x₂*y₁*y₃ + x₃*y₁^3*y₂*y₃^2 - x₃*y₁^3*y₂ - x₃*y₁*y₂*y₃^2 + x₃*y₁*y₂) * hp2
+    + (a^3*x₁^3*x₂^3*x₃ - a^2*x₁^3*x₂^2*y₂*y₃ + a^2*x₁^3*x₂*x₃*y₂^2 - a^2*x₁^3*x₂*x₃ - a^2*x₁^2*x₂^3*y₁*y₃ - a^2*x₁^2*x₂^2*x₃*y₁*y₂ + a^2*x₁*x₂^3*x₃*y₁^2 - a^2*x₁*x₂^3*x₃ + a*d*x₁^2*x₂^2*x₃*y₁*y₂ - a*x₁^3*y₂^3*y₃ + a*x₁^3*y₂*y₃ - a*x₁^2*x₂*y₁*y₂^2*y₃ + a*x₁^2*x₂*y₁*y₃ - a*x₁^2*x₃*y₁*y₂^3 + a*x₁^2*x₃*y₁*y₂ - a*x₁*x₂^2*y₁^2*y₂*y₃ + a*x₁*x₂^2*y₂*y₃ + a*x₁*x₂*x₃*y₁^2*y₂^2 - a*x₁*x₂*x₃*y₁^2 - a*x₁*x₂*x₃*y₂^2 + a*x₁*x₂*x₃ - a*x₂^3*y₁^3*y₃ + a*x₂^3*y₁*y₃ - a*x₂^2*x₃*y₁^3*y₂ + a*x₂^2*x₃*y₁*y₂ + d*x₁^2*x₂*y₁*y₂^2*y₃ + d*x₁*x₂^2*y₁^2*y₂*y₃ - d*x₁*x₂*x₃*y₁^2*y₂^2 - x₁*y₁^2*y₂^3*y₃ + x₁*y₁^2*y₂*y₃ + x₁*y₂^3*y₃ - x₁*y₂*y₃ - x₂*y₁^3*y₂^2*y₃ + x₂*y₁^3*y₃ + x₂*y₁*y₂^2*y₃ - x₂*y₁*y₃ - x₃*y₁^3*y₂^3 + x₃*y₁^3*y₂ + x₃*y₁*y₂^3 - x₃*y₁*y₂) * hp3
+
+/-- Cross-multiplication identity for Y-associativity. -/
+theorem addPoint_assoc_polyY (a d x₁ y₁ x₂ y₂ x₃ y₃ : F)
+    (hp1 : a * x₁^2 + y₁^2 = 1 + d * x₁^2 * y₁^2)
+    (hp2 : a * x₂^2 + y₂^2 = 1 + d * x₂^2 * y₂^2)
+    (hp3 : a * x₃^2 + y₃^2 = 1 + d * x₃^2 * y₃^2) :
+    let nx12 := x₁ * y₂ + y₁ * x₂
+    let dx12 := 1 + d * x₁ * x₂ * y₁ * y₂
+    let ny12 := y₁ * y₂ - a * x₁ * x₂
+    let dy12 := 1 - d * x₁ * x₂ * y₁ * y₂
+    let nx23 := x₂ * y₃ + y₂ * x₃
+    let dx23 := 1 + d * x₂ * x₃ * y₂ * y₃
+    let ny23 := y₂ * y₃ - a * x₂ * x₃
+    let dy23 := 1 - d * x₂ * x₃ * y₂ * y₃
+    (ny12 * dx12 * y₃ - a * nx12 * dy12 * x₃) *
+        (dx23 * dy23 - d * x₁ * y₁ * nx23 * ny23) =
+      (y₁ * ny23 * dx23 - a * x₁ * nx23 * dy23) *
+        (dx12 * dy12 - d * nx12 * ny12 * x₃ * y₃) := by
+  intro nx12 dx12 ny12 dy12 nx23 dx23 ny23 dy23
+  simp only [nx12, dx12, ny12, dy12, nx23, dx23, ny23, dy23]
+  linear_combination
+      (a^2*d*x₁*x₂^4*x₃*y₂*y₃^2 - a^2*d*x₁*x₂^2*x₃^3*y₂^3 - a^2*d*x₂^4*x₃^2*y₁*y₂*y₃ - a^2*d*x₂^3*x₃^3*y₁*y₂^2 - a*d^2*x₁*x₂^4*x₃*y₂^3*y₃^2 - a*d^2*x₁*x₂^3*x₃^2*y₂^4*y₃ + a*d^2*x₂^4*x₃^2*y₁*y₂^3*y₃ - a*d*x₁*x₂^3*y₂^2*y₃^3 + a*d*x₁*x₂^3*y₂^2*y₃ + a*d*x₁*x₂^2*x₃*y₂^3 + a*d*x₁*x₂*x₃^2*y₂^4*y₃ + a*d*x₂^3*x₃*y₁*y₂^2 - d^2*x₂^3*x₃*y₁*y₂^4*y₃^2 + d*x₂^2*y₁*y₂^3*y₃^3 - d*x₂^2*y₁*y₂^3*y₃ + d*x₂*x₃*y₁*y₂^4*y₃^2) * hp1
+    + (-a^3*x₁^3*x₂*x₃^2*y₃ - a^3*x₁^3*x₃^3*y₂ - a^3*x₁^2*x₂*x₃^3*y₁ - a^2*d*x₁^3*x₂^2*x₃*y₂*y₃^2 - a^2*d*x₁^3*x₂*x₃^2*y₂^2*y₃ + a^2*d*x₁^3*x₂*x₃^2*y₃^3 + a^2*d*x₁^3*x₃^3*y₂*y₃^2 + a^2*d*x₁^2*x₂^2*x₃^2*y₁*y₂*y₃ + a^2*d*x₁^2*x₂*x₃^3*y₁*y₃^2 - a^2*x₁^3*x₂*y₃^3 + a^2*x₁^3*x₂*y₃ - a^2*x₁^3*x₃*y₂*y₃^2 + a^2*x₁^3*x₃*y₂ - a^2*x₁^2*x₂*x₃*y₁*y₃^2 + a^2*x₁^2*x₂*x₃*y₁ + a^2*x₁^2*x₃^2*y₁*y₂*y₃ - a^2*x₁*x₂*x₃^2*y₁^2*y₃ + a^2*x₁*x₂*x₃^2*y₃ - a^2*x₁*x₃^3*y₁^2*y₂ + a^2*x₁*x₃^3*y₂ - a^2*x₂*x₃^3*y₁^3 + a^2*x₂*x₃^3*y₁ - a*d^2*x₁^2*x₂^2*x₃^2*y₁*y₂*y₃^3 + a*d^2*x₁^2*x₂*x₃^3*y₁*y₂^2*y₃^2 + a*d^2*x₁*x₂^2*x₃^3*y₁^2*y₂*y₃^2 - a*d*x₁^2*x₂*x₃*y₁*y₂^2*y₃^2 - a*d*x₁^2*x₃^2*y₁*y₂*y₃^3 - a*d*x₁*x₂^2*x₃*y₁^2*y₂*y₃^2 + a*d*x₁*x₂^2*x₃*y₂*y₃^2 - a*d*x₁*x₂*x₃^2*y₁^2*y₂^2*y₃ + a*d*x₁*x₂*x₃^2*y₁^2*y₃^3 + a*d*x₁*x₂*x₃^2*y₂^2*y₃ - a*d*x₁*x₂*x₃^2*y₃^3 + a*d*x₁*x₃^3*y₁^2*y₂*y₃^2 - a*d*x₁*x₃^3*y₂*y₃^2 + a*d*x₂^2*x₃^2*y₁^3*y₂*y₃ - a*d*x₂^2*x₃^2*y₁*y₂*y₃ + a*d*x₂*x₃^3*y₁^3*y₃^2 - a*d*x₂*x₃^3*y₁*y₃^2 + a*x₁^2*y₁*y₂*y₃^3 - a*x₁^2*y₁*y₂*y₃ - a*x₁*x₂*y₁^2*y₃^3 + a*x₁*x₂*y₁^2*y₃ + a*x₁*x₂*y₃^3 - a*x₁*x₂*y₃ - a*x₁*x₃*y₁^2*y₂*y₃^2 + a*x₁*x₃*y₁^2*y₂ + a*x₁*x₃*y₂*y₃^2 - a*x₁*x₃*y₂ - a*x₂*x₃*y₁^3*y₃^2 + a*x₂*x₃*y₁^3 + a*x₂*x₃*y₁*y₃^2 - a*x₂*x₃*y₁ + a*x₃^2*y₁^3*y₂*y₃ - a*x₃^2*y₁*y₂*y₃ + d^2*x₁*x₂*x₃^2*y₁^2*y₂^2*y₃^3 - d*x₂*x₃*y₁^3*y₂^2*y₃^2 + d*x₂*x₃*y₁*y₂^2*y₃^2 - d*x₃^2*y₁^3*y₂*y₃^3 + d*x₃^2*y₁*y₂*y₃^3 + y₁^3*y₂*y₃^3 - y₁^3*y₂*y₃ - y₁*y₂*y₃^3 + y₁*y₂*y₃) * hp2
+    + (a^3*x₁^3*x₂^3*y₃ + a^3*x₁^3*x₂^2*x₃*y₂ + a^3*x₁^2*x₂^3*x₃*y₁ + a^2*x₁^3*x₂*y₂^2*y₃ - a^2*x₁^3*x₂*y₃ + a^2*x₁^3*x₃*y₂^3 - a^2*x₁^3*x₃*y₂ - a^2*x₁^2*x₂^2*y₁*y₂*y₃ + a^2*x₁^2*x₂*x₃*y₁*y₂^2 - a^2*x₁^2*x₂*x₃*y₁ + a^2*x₁*x₂^3*y₁^2*y₃ - a^2*x₁*x₂^3*y₃ + a^2*x₁*x₂^2*x₃*y₁^2*y₂ - a^2*x₁*x₂^2*x₃*y₂ + a^2*x₂^3*x₃*y₁^3 - a^2*x₂^3*x₃*y₁ + a*d*x₁^2*x₂^2*y₁*y₂*y₃ - a*d*x₁^2*x₂*x₃*y₁*y₂^2 - a*d*x₁*x₂^2*x₃*y₁^2*y₂ - a*x₁^2*y₁*y₂^3*y₃ + a*x₁^2*y₁*y₂*y₃ + a*x₁*x₂*y₁^2*y₂^2*y₃ - a*x₁*x₂*y₁^2*y₃ - a*x₁*x₂*y₂^2*y₃ + a*x₁*x₂*y₃ + a*x₁*x₃*y₁^2*y₂^3 - a*x₁*x₃*y₁^2*y₂ - a*x₁*x₃*y₂^3 + a*x₁*x₃*y₂ - a*x₂^2*y₁^3*y₂*y₃ + a*x₂^2*y₁*y₂*y₃ + a*x₂*x₃*y₁^3*y₂^2 - a*x₂*x₃*y₁^3 - a*x₂*x₃*y₁*y₂^2 + a*x₂*x₃*y₁ - d*x₁*x₂*y₁^2*y₂^2*y₃ - y₁^3*y₂^3*y₃ + y₁^3*y₂*y₃ + y₁*y₂^3*y₃ - y₁*y₂*y₃) * hp3
+
 end EdwardsPoint
 end PlonkLean.EllipticCurve

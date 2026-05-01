@@ -53,22 +53,28 @@ The two multisets above are equal iff copy constraints under σ hold.
 
 Direction `→`: σ permutes flattened indices; if the σ-permuted multiset
 equals the identity multiset (where the identifier is read off the *original*
-position), and the identifier values are injective on `Fin (3n)` (because
-the cosets `H, k₁H, k₂H` are disjoint and `D.element` is injective on `Fin n`),
-then we can recover that `flatten w (σ i) = flatten w i` for all `i`, which
-is exactly `CopyConstraints σ w`.
+position), and the identifier values are injective on `Fin (3n)`, then we
+recover `flatten w (σ i) = flatten w i` for all `i`, which is exactly
+`CopyConstraints σ w`.
 
 Direction `←`: applying σ as a permutation of the index set rearranges the
 multiset but preserves equality, and CopyConstraints ensures witness values
 match.
 
-Hypotheses on `k1, k2` may be needed to ensure injectivity of `idValue`. -/
+**Hypothesis note (corrected):** the original "weak nontriviality" conditions
+on `k1, k2` (`h_k1_nontrivial : ∀ i, D.element i * k1 ≠ D.element i`, etc.)
+are *insufficient* — they rule out only the diagonal case, not cross-row
+collisions like `D.element a = k1 · D.element b` for `a ≠ b`. The clean
+condition is full injectivity of `idValue`, which is the *standard Plonk*
+coset-disjointness requirement: `k1, k2, k1/k2 ∉ H` (the multiplicative
+subgroup of `n`-th roots of unity), plus `k1, k2 ≠ 0`.
+
+We take injectivity directly as a hypothesis here; downstream call sites
+discharge it from the standard Plonk coset choice. -/
 theorem multiset_equality_iff_copyConstraints
     (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
     (k1 k2 γ : F)
-    (h_k1_nontrivial : ∀ i : Fin n, D.element i * k1 ≠ D.element i)
-    (h_k2_nontrivial : ∀ i : Fin n, D.element i * k2 ≠ D.element i)
-    (h_k1_k2_distinct : k1 ≠ k2) :
+    (h_idValue_inj : Function.Injective (idValue D k1 k2)) :
     idMultiset D w k1 k2 γ = sigmaMultiset D σ w k1 k2 γ ↔
     CopyConstraints σ w := by
   sorry

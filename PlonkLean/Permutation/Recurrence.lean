@@ -41,13 +41,30 @@ variable {F : Type*} [Field F] {n : ℕ}
 
 For the canonical Plonk grand product with non-zero denominators at every
 row, the permutation main identity polynomial vanishes on the evaluation
-domain. (This is the "completeness" half — the prover's honest construction
-satisfies the polynomial identity.)
+domain — *provided the wraparound condition holds at the final row*.
+
+**Statement note (corrected):** the original `h_denom`-only hypothesis is
+insufficient — at row `i = n-1` the recurrence reduces to a wraparound
+condition `Z(ω^n) · denom(n-1) = Z(ω^(n-1)) · num(n-1)` (with
+`ω^n = ω^0`), which is exactly the multiset-equality channel handled by
+sub-sub-lemma C4 (`RecurrenceMultiset.lean`). We therefore add an
+`h_wrap` hypothesis isolating that boundary row; sub-sub-lemma C4 then
+proves `h_wrap` is equivalent to the multiset equality, completing the
+permutation argument when both lemmas are composed.
+
+For non-boundary rows `(i.val + 1) < n`, the polynomial identity follows
+from the telescoping definition of `grandProductValues` (using `h_denom`
+to invert denominators).
 -/
 theorem permMain_vanishes_on_domain
     (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
     (β γ k1 k2 : F)
-    (h_denom : ∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0) :
+    (h_denom : ∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0)
+    (h_wrap : ∀ i : Fin n, (i : ℕ) + 1 = n →
+      (PlonkLean.Permutation.grandProductPoly D σ w β γ k1 k2).eval
+        (D.ω ^ ((i : ℕ) + 1)) *
+        denom D σ w β γ k1 k2 i =
+      grandProductValues D σ w β γ k1 k2 i * num D w β γ k1 k2 i) :
     ∀ i : Fin n, (PlonkLean.permutationMainPoly D σ w β γ k1 k2).eval
         (D.element i) = 0 := by
   sorry

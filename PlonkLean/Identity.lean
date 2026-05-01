@@ -141,27 +141,75 @@ theorem gateIdentity_vanishes_iff
   · rw [← gateIdentityPoly_eval_eq]; exact h i
   · rw [gateIdentityPoly_eval_eq]; exact h i
 
-/-- **Sub-lemma C (permutation).** The conjunction of the permutation main
-identity and permutation boundary identity vanishing on `H` is equivalent to
-the copy constraints holding under `σ`.
+/-- **Sub-lemma C (permutation, reverse direction — completeness).**
 
-The boundary half is trivial post-refactor: `Permutation.permBoundary_vanishes_on_domain`
-(sub-sub-lemma C1) establishes that the boundary polynomial vanishes universally
-on `H` for the canonical Plonk grand product, regardless of CopyConstraints.
+If the witness satisfies copy constraints under `σ`, then the permutation main
+and boundary identity polynomials vanish on the evaluation domain.
 
-The main half is the deep work. The forward direction
-`(permMain vanishes) → CopyConstraints` requires composing:
-* C2 reverse direction (poly vanishes → recurrence) — not yet proven (only forward).
-* C4 forward (recurrence ↔ multiset equality) — sorry'd.
-* C3 forward (multiset → CopyConstraints) — proven.
+Proof path: `CopyConstraints → multiset equality (C3) → recurrence (C4 backward)
+→ poly vanishes (C2)`. The boundary half is `permBoundary_vanishes_on_domain`
+(C1), universal for the canonical Plonk grand product. -/
+theorem copyConstraints_implies_permutation_vanishes
+    (D : EvaluationDomain F n) (hn : 0 < n) (σ : Permutation.Sigma n)
+    (w : Arithmetization.Witness F n) (k1 k2 : F)
+    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2)) :
+    Permutation.CopyConstraints σ w →
+    ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+      (∀ i : Fin n, Permutation.denom D σ w β γ k1 k2 i ≠ 0) →
+      ((∀ i : Fin n, (permutationMainPoly D σ w β γ k1 k2).eval (D.element i) = 0) ∧
+       (∀ i : Fin n, (permutationBoundaryPoly D σ w β γ k1 k2).eval (D.element i) = 0)) := by
+  intro h_copy β γ hβ hγ h_denom
+  refine ⟨?_, Permutation.permBoundary_vanishes_on_domain D hn σ w β γ k1 k2⟩
+  have h_mset : ∀ γ' : F, Permutation.idMultiset D w k1 k2 γ' =
+      Permutation.sigmaMultiset D σ w k1 k2 γ' := fun γ' =>
+    (Permutation.multiset_equality_iff_copyConstraints D σ w k1 k2 γ' h_idValue_inj).mpr h_copy
+  have h_rec :=
+    (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2).mpr h_mset
+      β γ hβ hγ h_denom
+  apply Permutation.permMain_vanishes_on_domain D σ w β γ k1 k2 h_denom
+  intro i hi_wrap
+  have hi := h_rec i
+  have h_mod : ((i : ℕ) + 1) % n = 0 := by rw [hi_wrap, Nat.mod_self]
+  have h_pow : D.ω ^ ((i : ℕ) + 1) = 1 := by
+    rw [hi_wrap]; exact D.is_primitive.pow_eq_one
+  have h_eval_one :
+      (Permutation.grandProductPoly D σ w β γ k1 k2).eval
+        (D.ω ^ ((i : ℕ) + 1)) = 1 := by
+    have h_elt0 : D.element (⟨0, hn⟩ : Fin n) = D.ω ^ ((i : ℕ) + 1) := by
+      simp [EvaluationDomain.element, h_pow]
+    calc (Permutation.grandProductPoly D σ w β γ k1 k2).eval
+            (D.ω ^ ((i : ℕ) + 1))
+        = (Permutation.grandProductPoly D σ w β γ k1 k2).eval
+            (D.element (⟨0, hn⟩ : Fin n)) := by rw [h_elt0]
+      _ = Permutation.grandProductValues D σ w β γ k1 k2 ⟨0, hn⟩ :=
+            Permutation.grandProductPoly_eval D σ w β γ k1 k2 ⟨0, hn⟩
+      _ = 1 := Permutation.grandProductValues_zero D σ w β γ k1 k2 hn
+  have h_rec_lhs :
+      Permutation.grandProductValues D σ w β γ k1 k2
+          ⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ = 1 := by
+    have h_idx_eq :
+        (⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ : Fin n) = ⟨0, hn⟩ := Fin.ext h_mod
+    rw [h_idx_eq]
+    exact Permutation.grandProductValues_zero D σ w β γ k1 k2 hn
+  rw [h_eval_one]
+  rw [h_rec_lhs] at hi
+  linear_combination hi
 
-The reverse direction `CopyConstraints → (permMain vanishes)` is C3.mpr ∘ C4.mpr ∘ C2,
-all available as sub-lemmas (C2 has its own internal sorry on `grandProductValues_succ`).
+/-- **Sub-lemma C (permutation, biconditional — STUB).**
 
-Both directions require strengthening the hypotheses (`hn`, `h_idValue_inj`,
-`h_denom`, `h_wrap`); the `(β, γ)` quantifier may also need universalization.
-The full clean composition is left as a follow-up; for now we keep the original
-fixed-`(β, γ)` biconditional with `sorry`, and document the proof path. -/
+Bridge between polynomial vanishing on `H` and copy-constraint satisfaction.
+The reverse direction (`CopyConstraints → vanishes`) is closed via
+`copyConstraints_implies_permutation_vanishes` above. The forward direction
+(`vanishes → CopyConstraints`) requires composing:
+- C2's biconditional `permMain_vanishes_iff_recurrence` (now proven)
+- C4's forward direction (currently sorry'd)
+- C3's forward direction (proven)
+
+But it also requires *quantifier strengthening* — the forward direction at a
+fixed `(β, γ)` is not generically true; it requires `∀ β γ` quantification or
+additional hypotheses on the witness. We retain this biconditional with
+`sorry` so the headline theorem can still rewrite through it; future work
+will replace it with the strengthened `∀β γ` version. -/
 theorem permutation_vanishes_iff
     (D : EvaluationDomain F n) (σ : Permutation.Sigma n)
     (w : Arithmetization.Witness F n) (β γ k1 k2 : F)

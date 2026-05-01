@@ -152,13 +152,38 @@ theorem add_eight_eq_zero (p : F × F) (h : OnCurve p) :
     let q : SmallPoint := ⟨p, h⟩
     q + q + q + q + q + q + q + q = (0 : SmallPoint) := by
   intro q
-  -- Reduce to the underlying F × F equation via Subtype.ext
   apply Subtype.ext
   show addPt (addPt (addPt (addPt (addPt (addPt (addPt p p) p) p) p) p) p) p
         = zeroPt
-  -- This is a decide-able fact about the 8 specific points.
   revert h p
   decide
+
+/-! ## Module structure (canonical from Mathlib)
+
+Once `AddCommGroup SmallPoint` is in place, Mathlib's typeclass machinery
+automatically derives:
+* `AddGroup SmallPoint` — `inferInstance`
+* `AddMonoid SmallPoint` — `inferInstance`
+* `SubNegMonoid SmallPoint` — `inferInstance`
+* The canonical action of `ℤ` (from any `AddGroup`).
+
+This demonstrates that the elliptic-curve group lives in Mathlib's
+algebraic hierarchy as a first-class object. -/
+
+example : AddGroup SmallPoint := inferInstance
+example : AddMonoid SmallPoint := inferInstance
+example : SubNegMonoid SmallPoint := inferInstance
+
+/-- Demonstrate ℤ-action exists: there's a `SMul ℤ SmallPoint` instance. -/
+example : SMul ℤ SmallPoint := inferInstance
+
+/-- The group has 8 elements (the type `SmallPoint` is in bijection with the
+`points` Finset). -/
+theorem smallPoint_finite : ∃ (s : Finset (F × F)),
+    s.card = 8 ∧ ∀ p : SmallPoint, p.val ∈ s := by
+  refine ⟨points, ?_, ?_⟩
+  · exact points_card
+  · exact val_mem
 
 end SmallPoint
 end PlonkLean.EllipticCurve.Small

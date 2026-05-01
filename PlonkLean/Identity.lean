@@ -195,29 +195,63 @@ theorem copyConstraints_implies_permutation_vanishes
   rw [h_rec_lhs] at hi
   linear_combination hi
 
-/-- **Sub-lemma C (permutation, biconditional — STUB).**
+/-- **Sub-lemma C (permutation, biconditional — strengthened ∀β γ form).**
 
 Bridge between polynomial vanishing on `H` and copy-constraint satisfaction.
-The reverse direction (`CopyConstraints → vanishes`) is closed via
-`copyConstraints_implies_permutation_vanishes` above. The forward direction
-(`vanishes → CopyConstraints`) requires composing:
-- C2's biconditional `permMain_vanishes_iff_recurrence` (now proven)
-- C4's forward direction (currently sorry'd)
-- C3's forward direction (proven)
+The forward direction at a fixed `(β, γ)` is **not** generically true; the
+clean perfect-soundness statement quantifies universally over `(β, γ)` with
+the standard non-degeneracy side conditions (`β ≠ 0`, `γ ≠ 0`, `denom ≠ 0`).
 
-But it also requires *quantifier strengthening* — the forward direction at a
-fixed `(β, γ)` is not generically true; it requires `∀ β γ` quantification or
-additional hypotheses on the witness. We retain this biconditional with
-`sorry` so the headline theorem can still rewrite through it; future work
-will replace it with the strengthened `∀β γ` version. -/
+Forward proof: C2 biconditional (`permMain_vanishes_iff_recurrence`) extracts
+a row recurrence at each `(β, γ)`, then C4 forward
+(`recurrence_boundary_iff_multiset.mp`) yields `∀ γ, multiset eq`, and C3 at
+`γ = 0` yields `CopyConstraints`.
+
+Reverse proof: direct application of `copyConstraints_implies_permutation_vanishes`. -/
 theorem permutation_vanishes_iff
-    (D : EvaluationDomain F n) (σ : Permutation.Sigma n)
-    (w : Arithmetization.Witness F n) (β γ k1 k2 : F)
-    (_h_random : β ≠ 0 ∧ γ ≠ 0) :
-    ((∀ i : Fin n, (permutationMainPoly D σ w β γ k1 k2).eval (D.element i) = 0) ∧
-     (∀ i : Fin n, (permutationBoundaryPoly D σ w β γ k1 k2).eval (D.element i) = 0)) ↔
+    (D : EvaluationDomain F n) (hn : 0 < n) (σ : Permutation.Sigma n)
+    (w : Arithmetization.Witness F n) (k1 k2 : F)
+    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2)) :
+    (∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+      (∀ i : Fin n, Permutation.denom D σ w β γ k1 k2 i ≠ 0) →
+      ((∀ i : Fin n, (permutationMainPoly D σ w β γ k1 k2).eval (D.element i) = 0) ∧
+       (∀ i : Fin n, (permutationBoundaryPoly D σ w β γ k1 k2).eval (D.element i) = 0))) ↔
     Permutation.CopyConstraints σ w := by
-  sorry
+  refine ⟨fun h => ?_, fun h_copy β γ hβ hγ h_denom => ?_⟩
+  · -- Forward: the universal vanishing implies CopyConstraints.
+    have h_rec : ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+        (∀ i : Fin n, Permutation.denom D σ w β γ k1 k2 i ≠ 0) →
+        ∀ i : Fin n,
+          Permutation.grandProductValues D σ w β γ k1 k2
+              ⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ *
+            Permutation.denom D σ w β γ k1 k2 i =
+          Permutation.grandProductValues D σ w β γ k1 k2 i *
+            Permutation.num D w β γ k1 k2 i := by
+      intro β γ hβ hγ h_denom i
+      have hmain := (h β γ hβ hγ h_denom).1
+      have hC2 :=
+        (Permutation.permMain_vanishes_iff_recurrence D σ w β γ k1 k2 h_denom).mp hmain i
+      have h_pow_eq : D.ω ^ ((i : ℕ) + 1) =
+          D.element (⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ : Fin n) := by
+        show D.ω ^ ((i : ℕ) + 1) = D.ω ^ (((i : ℕ) + 1) % n)
+        have hω : D.ω ^ n = 1 := D.is_primitive.pow_eq_one
+        conv_lhs => rw [← Nat.div_add_mod ((i : ℕ) + 1) n, pow_add, pow_mul, hω, one_pow,
+                         one_mul]
+      have h_eval :
+          (Permutation.grandProductPoly D σ w β γ k1 k2).eval (D.ω ^ ((i : ℕ) + 1)) =
+          Permutation.grandProductValues D σ w β γ k1 k2
+              ⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ := by
+        rw [h_pow_eq, Permutation.grandProductPoly_eval]
+      rw [h_eval] at hC2
+      exact hC2
+    have h_mset : ∀ γ : F,
+        Permutation.idMultiset D w k1 k2 γ = Permutation.sigmaMultiset D σ w k1 k2 γ :=
+      (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2).mp h_rec
+    exact (Permutation.multiset_equality_iff_copyConstraints D σ w k1 k2 0
+      h_idValue_inj).mp (h_mset 0)
+  · -- Reverse: CopyConstraints implies vanishing for any (β, γ).
+    exact copyConstraints_implies_permutation_vanishes D hn σ w k1 k2 h_idValue_inj
+      h_copy β γ hβ hγ h_denom
 
 /-- **Sub-lemma D (α-separation, ∀α version).** A polynomial of the form
 `p₀ + α·p₁ + α²·p₂` vanishes on the evaluation domain *for every* `α` iff
@@ -265,34 +299,34 @@ theorem alpha_separation_vanishes
 
 A witness satisfies a Plonk constraint system (with no lookup) if and only if
 the master identity polynomial is divisible by the vanishing polynomial
-`Z_H(X) = X^n - 1` *for every choice of separator challenge α*.
+`Z_H(X) = X^n - 1` *for every choice of separator challenge α* and *for
+every choice of permutation challenges (β, γ)* with the standard
+non-degeneracy conditions `β ≠ 0`, `γ ≠ 0`, and `denom ≠ 0` on the domain.
 
-* **Forward** (`Satisfies → ∀α, ∃ t`): *completeness.* An honest prover can
-  exhibit a quotient polynomial for every α.
-* **Reverse** (`∀α, ∃ t → Satisfies`): *soundness.* If the master identity is
-  divisible by `Z_H` for every α, then the witness satisfies the circuit.
+The `∀α` quantifier is essential for α-separation. The `∀β γ` quantifier is
+essential for the perfect (non-probabilistic) statement of the permutation
+argument: no fixed-`(β, γ)` statement is true in general. The probabilistic
+Schwartz-Zippel form bounds the failure probability for randoms drawn after
+the prover commits.
 
-The `∀α` quantifier is essential for the perfect (non-probabilistic) statement:
-no fixed-α statement is true in general (an adversarially chosen α can satisfy
-the divisibility for an unsatisfying witness). The probabilistic Schwartz-Zippel
-form bounds the failure probability for a random α drawn after the prover commits.
-
-The proof is a structured composition of four sub-lemmas
-(`vanishes_iff_vanishingPoly_dvd`, `gateIdentity_vanishes_iff`,
-`permutation_vanishes_iff`, `alpha_separation_vanishes`) plus a small
-lookup-elimination step using `h_no_lookup`. Three of the four sub-lemmas
-are fully proven; only `permutation_vanishes_iff` (Plonk paper §5, the
-multiset-equality argument) remains `sorry`. -/
+The hypothesis `h_exists_random` is needed only for the soundness direction:
+to extract the `(β, γ)`-independent gate-vanishing fact from the universal
+statement we need at least one valid `(β, γ)`. Cryptographic Plonk meets this
+condition trivially via Fiat-Shamir from a field of cryptographic size. -/
 theorem plonk_satisfaction_iff_quotient
     (D : EvaluationDomain F n) (hn : 0 < n) (h2 : (2 : F) ≠ 0)
     (Cs : Arithmetization.Circuit F n) (w : Arithmetization.Witness F n)
-    (β γ k1 k2 : F)
-    (h_random : β ≠ 0 ∧ γ ≠ 0)
-    (h_no_lookup : Cs.lookup = none) :
+    (k1 k2 : F)
+    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2))
+    (h_no_lookup : Cs.lookup = none)
+    (h_exists_random : ∃ β₀ γ₀ : F, β₀ ≠ 0 ∧ γ₀ ≠ 0 ∧
+      ∀ i : Fin n, Permutation.denom D Cs.sigma w β₀ γ₀ k1 k2 i ≠ 0) :
     Cs.Satisfies w ↔
-    ∀ α : F, ∃ t : _root_.Polynomial F,
-      masterIdentity D Cs w β γ k1 k2 α = t * Poly.vanishingPoly F n := by
-  -- Step 1: eliminate the lookup conjunct (vacuous when Cs.lookup = none)
+    ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+      (∀ i : Fin n, Permutation.denom D Cs.sigma w β γ k1 k2 i ≠ 0) →
+      ∀ α : F, ∃ t : _root_.Polynomial F,
+        masterIdentity D Cs w β γ k1 k2 α = t * Poly.vanishingPoly F n := by
+  -- Step 1: lookup elimination
   have h_satisfies : Cs.Satisfies w ↔
       (∀ i : Fin n, Cs.selectors.gateValue w i = 0) ∧
       Permutation.CopyConstraints Cs.sigma w := by
@@ -300,27 +334,54 @@ theorem plonk_satisfaction_iff_quotient
     rw [h_no_lookup]
     simp
   rw [h_satisfies]
-  -- Step 2: each ∃ t becomes a divisibility, ∀α threaded through
-  have h_dvd : (∀ α : F, ∃ t : _root_.Polynomial F,
-        masterIdentity D Cs w β γ k1 k2 α = t * Poly.vanishingPoly F n) ↔
-      ∀ α : F, Poly.vanishingPoly F n ∣ masterIdentity D Cs w β γ k1 k2 α := by
-    refine forall_congr' fun α => ?_
-    constructor
-    · rintro ⟨t, ht⟩; exact ⟨t, by rw [ht, mul_comm]⟩
-    · rintro ⟨t, ht⟩; exact ⟨t, by rw [ht, mul_comm]⟩
-  rw [h_dvd]
-  -- Step 3: divisibility ↔ vanishes-on-H, threaded through ∀α
-  have h_van : (∀ α : F, Poly.vanishingPoly F n ∣ masterIdentity D Cs w β γ k1 k2 α) ↔
-      ∀ α : F, ∀ i : Fin n,
-        (masterIdentity D Cs w β γ k1 k2 α).eval (D.element i) = 0 := by
-    refine forall_congr' fun α => ?_
-    rw [← vanishes_iff_vanishingPoly_dvd D hn]
-  rw [h_van]
-  -- Step 4: unfold masterIdentity and apply α-separation
-  unfold masterIdentity
-  rw [alpha_separation_vanishes D h2]
-  -- Goal: gate ∧ copy ↔ (gate-vanish) ∧ (perm-main-vanish) ∧ (perm-bdy-vanish)
-  -- Step 5: rewrite gate component and combine permutation components
-  rw [gateIdentity_vanishes_iff, ← permutation_vanishes_iff D Cs.sigma w β γ k1 k2 h_random]
+  constructor
+  · -- Forward: gate ∧ copy → ∀ β γ α, ∃ t
+    rintro ⟨h_gate, h_copy⟩ β γ hβ hγ h_denom α
+    have h_gid : ∀ i, (gateIdentityPoly D Cs.selectors w).eval (D.element i) = 0 :=
+      (gateIdentity_vanishes_iff D Cs.selectors w).mpr h_gate
+    have h_perm := (permutation_vanishes_iff D hn Cs.sigma w k1 k2 h_idValue_inj).mpr
+      h_copy β γ hβ hγ h_denom
+    have h_master_van : ∀ i, (masterIdentity D Cs w β γ k1 k2 α).eval (D.element i) = 0 := by
+      intro i
+      unfold masterIdentity
+      simp [Polynomial.eval_add, Polynomial.eval_mul, Polynomial.eval_C,
+            h_gid i, h_perm.1 i, h_perm.2 i]
+    obtain ⟨t, ht⟩ := (vanishes_iff_vanishingPoly_dvd D hn _).mp h_master_van
+    exact ⟨t, by rw [ht, mul_comm]⟩
+  · -- Reverse: ∀ β γ α, ∃ t → gate ∧ copy
+    intro h
+    have h_van : ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+        (∀ i : Fin n, Permutation.denom D Cs.sigma w β γ k1 k2 i ≠ 0) →
+        ∀ α : F, ∀ i : Fin n,
+          (masterIdentity D Cs w β γ k1 k2 α).eval (D.element i) = 0 := by
+      intro β γ hβ hγ h_denom α
+      rw [vanishes_iff_vanishingPoly_dvd D hn]
+      obtain ⟨t, ht⟩ := h β γ hβ hγ h_denom α
+      exact ⟨t, by rw [ht]; ring⟩
+    have h_split : ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+        (∀ i : Fin n, Permutation.denom D Cs.sigma w β γ k1 k2 i ≠ 0) →
+        (∀ i : Fin n, (gateIdentityPoly D Cs.selectors w).eval (D.element i) = 0) ∧
+        (∀ i : Fin n, (permutationMainPoly D Cs.sigma w β γ k1 k2).eval (D.element i) = 0) ∧
+        (∀ i : Fin n, (permutationBoundaryPoly D Cs.sigma w β γ k1 k2).eval (D.element i) = 0) := by
+      intro β γ hβ hγ h_denom
+      have h_alpha := h_van β γ hβ hγ h_denom
+      simp only [masterIdentity] at h_alpha
+      exact (alpha_separation_vanishes D h2 _ _ _).mp h_alpha
+    -- Extract gate from h_exists_random
+    obtain ⟨β₀, γ₀, hβ₀, hγ₀, h_denom₀⟩ := h_exists_random
+    have h_gate_van := (h_split β₀ γ₀ hβ₀ hγ₀ h_denom₀).1
+    have h_gate : ∀ i : Fin n, Cs.selectors.gateValue w i = 0 :=
+      (gateIdentity_vanishes_iff D Cs.selectors w).mp h_gate_van
+    -- Extract copy via permutation_vanishes_iff (strong form)
+    have h_perm_all : ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
+        (∀ i : Fin n, Permutation.denom D Cs.sigma w β γ k1 k2 i ≠ 0) →
+        ((∀ i : Fin n, (permutationMainPoly D Cs.sigma w β γ k1 k2).eval (D.element i) = 0) ∧
+         (∀ i : Fin n, (permutationBoundaryPoly D Cs.sigma w β γ k1 k2).eval (D.element i) = 0)) := by
+      intro β γ hβ hγ h_denom
+      have hs := h_split β γ hβ hγ h_denom
+      exact ⟨hs.2.1, hs.2.2⟩
+    have h_copy : Permutation.CopyConstraints Cs.sigma w :=
+      (permutation_vanishes_iff D hn Cs.sigma w k1 k2 h_idValue_inj).mp h_perm_all
+    exact ⟨h_gate, h_copy⟩
 
 end PlonkLean

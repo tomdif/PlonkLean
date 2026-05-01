@@ -185,5 +185,33 @@ theorem smallPoint_finite : ∃ (s : Finset (F × F)),
   · exact points_card
   · exact val_mem
 
+/-! ## Cyclic structure with explicit generator `(2, 2)`. -/
+
+/-- `(2, 2)` is on the curve. -/
+theorem two_two_on_curve : OnCurve ((2, 2) : F × F) := by decide
+
+/-- A canonical generator for the order-8 cyclic group. -/
+def generator : SmallPoint := ⟨(2, 2), two_two_on_curve⟩
+
+/-- The 8 multiples of the generator span the group:
+0 → (0,1), 1 → (2,2), 2 → (1,0), 3 → (2,3),
+4 → (0,4), 5 → (3,3), 6 → (4,0), 7 → (3,2). -/
+theorem generator_powers :
+    addPt (0, 1) (2, 2) = (2, 2) ∧
+    addPt (2, 2) (2, 2) = (1, 0) ∧
+    addPt (1, 0) (2, 2) = (2, 3) ∧
+    addPt (2, 3) (2, 2) = (0, 4) ∧
+    addPt (0, 4) (2, 2) = (3, 3) ∧
+    addPt (3, 3) (2, 2) = (4, 0) ∧
+    addPt (4, 0) (2, 2) = (3, 2) ∧
+    addPt (3, 2) (2, 2) = (0, 1) := by decide
+
+/-- The cyclic order is exactly 8: starting from identity, repeatedly adding
+`(2, 2)` cycles through all 8 curve points and returns to identity. -/
+theorem generator_order_eight :
+    addPt (addPt (addPt (addPt (addPt (addPt (addPt (addPt (0,1) (2,2))
+      (2,2)) (2,2)) (2,2)) (2,2)) (2,2)) (2,2)) (2,2) = (0, 1) := by
+  decide
+
 end SmallPoint
 end PlonkLean.EllipticCurve.Small

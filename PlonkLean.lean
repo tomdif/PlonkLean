@@ -5,7 +5,9 @@ import PlonkLean.Arithmetization.Wire
 import PlonkLean.Arithmetization.Gate
 import PlonkLean.Arithmetization.ConstraintSystem
 import PlonkLean.Arithmetization.CustomGates
+import PlonkLean.Arithmetization.PublicInputs
 import PlonkLean.Arithmetization.R1CS
+import PlonkLean.Arithmetization.R1CSExt
 import PlonkLean.Permutation.Sigma
 import PlonkLean.Permutation.GrandProduct
 import PlonkLean.Permutation.Boundary
@@ -14,6 +16,8 @@ import PlonkLean.Permutation.MultisetEquality
 import PlonkLean.Permutation.RecurrenceMultiset
 import PlonkLean.Lookup.Plookup
 import PlonkLean.Lookup.PlookupBasics
+import PlonkLean.Lookup.PlookupSoundness
+import PlonkLean.Lookup.LogUp
 import PlonkLean.Identity
 import PlonkLean.KZG.Foundations
 import PlonkLean.KZG.Correctness
@@ -22,6 +26,9 @@ import PlonkLean.KZG.Batch
 import PlonkLean.KZG.PlonkBridge
 import PlonkLean.KZG.SchwartzZippel
 import PlonkLean.KZG.Concrete.Curve
+import PlonkLean.KZG.Concrete.BLS12
+import PlonkLean.KZG.ExtractedExample
+import PlonkLean.Crypto.FiatShamir
 import PlonkLean.KZG.Executable
 import PlonkLean.KZG.Probabilistic
 import PlonkLean.Circuits.Gadgets

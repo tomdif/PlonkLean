@@ -1,4 +1,4 @@
-import PlonkLean.Identity
+import PlonkLean.Permutation.Identities
 
 /-! # Sub-sub-lemma C1 — boundary equivalence
 

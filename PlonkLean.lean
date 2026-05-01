@@ -15,3 +15,5 @@ import PlonkLean.Identity
 import PlonkLean.KZG.Foundations
 import PlonkLean.KZG.Correctness
 import PlonkLean.KZG.Soundness
+import PlonkLean.KZG.Batch
+import PlonkLean.KZG.PlonkBridge

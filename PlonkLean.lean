@@ -6,5 +6,9 @@ import PlonkLean.Arithmetization.Gate
 import PlonkLean.Arithmetization.ConstraintSystem
 import PlonkLean.Permutation.Sigma
 import PlonkLean.Permutation.GrandProduct
+import PlonkLean.Permutation.Boundary
+import PlonkLean.Permutation.Recurrence
+import PlonkLean.Permutation.MultisetEquality
+import PlonkLean.Permutation.RecurrenceMultiset
 import PlonkLean.Lookup.Plookup
 import PlonkLean.Identity

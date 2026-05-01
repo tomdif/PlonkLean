@@ -1,6 +1,7 @@
 import PlonkLean.Permutation.GrandProduct
 import PlonkLean.Permutation.MultisetEquality
 import PlonkLean.Permutation.Recurrence
+import Mathlib.Algebra.MvPolynomial.Funext
 
 /-! # Sub-sub-lemma C4 — recurrence + boundary ↔ multiset equality
 
@@ -493,23 +494,37 @@ end PolynomialGammaExtension
 
 /-! ## Sub-claim 4: multiset products equal for all β ⇒ multisets equal -/
 
-/-- **Sub-claim 4a (deep polynomial-identity core, OPEN).**
+/-- Auxiliary: the bivariate prod equality lifts to an `MvPolynomial (Fin 2) F`
+identity via the lift `f p = C p.1 + C p.2 · X 0 + X 1`. -/
+private lemma bivariate_prod_eq_lifts
+    [Infinite F]
+    (N₁ N₂ : Multiset (F × F))
+    (h_prod : ∀ β γ : F,
+      (N₁.map fun p => p.1 + β * p.2 + γ).prod =
+      (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
+    let f : F × F → MvPolynomial (Fin 2) F := fun p =>
+      MvPolynomial.C p.1 + MvPolynomial.C p.2 * MvPolynomial.X 0 + MvPolynomial.X 1
+    (N₁.map f).prod = (N₂.map f).prod := by
+  intro f
+  apply MvPolynomial.funext
+  intro x
+  have h_eval : ∀ p : F × F,
+      MvPolynomial.eval x (f p) = p.1 + (x 0) * p.2 + (x 1) := by
+    intro p
+    simp [f, MvPolynomial.eval_add, MvPolynomial.eval_mul, MvPolynomial.eval_C,
+          MvPolynomial.eval_X, mul_comm]
+  rw [show MvPolynomial.eval x ((N₁.map f).prod) =
+         ((N₁.map f).map (MvPolynomial.eval x)).prod from
+       (Multiset.prod_hom (N₁.map f) (MvPolynomial.eval x).toMonoidHom).symm,
+      show MvPolynomial.eval x ((N₂.map f).prod) =
+         ((N₂.map f).map (MvPolynomial.eval x)).prod from
+       (Multiset.prod_hom (N₂.map f) (MvPolynomial.eval x).toMonoidHom).symm]
+  rw [Multiset.map_map, Multiset.map_map]
+  have ee : (MvPolynomial.eval x ∘ f) = fun p => p.1 + (x 0) * p.2 + (x 1) := by
+    funext p; exact h_eval p
+  rw [ee]
+  exact h_prod (x 0) (x 1)
 
-Given two multisets of `F × F` pairs with matching y-multisets and all
-y-values nonzero, if the products `∏ (xᵢ + β·yᵢ + γ)` agree as functions
-of `β` (for all `β ≠ 0`), then the pair-multisets themselves agree.
-
-Requires `[Infinite F]` (used via `Polynomial.eq_of_infinite_eval_eq`).
-For Plonk over BN254 / BLS12-381 finite scalar fields, an `[Fintype F]`
-with cardinality bound variant would be needed; we use the cleaner
-infinite-field formulation here, with the understanding that downstream
-uses can substitute (cryptographic Plonk fields are well above the
-required cardinality threshold).
-
-The `h_y_nonzero` hypothesis allows factoring `φ p = C(p.2)·(X − C(ρ p))`
-where `ρ p := -(p.1 + γ)/p.2` (the linear form's root); this is essential
-for the polynomial-roots argument. In Plonk, `idValue` outputs lie in
-`H ∪ k₁H ∪ k₂H ⊂ F^*` so the y-nonzero condition holds when `k₁, k₂ ≠ 0`. -/
 theorem pair_multiset_eq_of_y_match_and_prod_eq
     [Infinite F]
     (N₁ N₂ : Multiset (F × F))
@@ -517,24 +532,33 @@ theorem pair_multiset_eq_of_y_match_and_prod_eq
       (N₁.map fun p => p.1 + β * p.2 + γ).prod =
       (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
     N₁ = N₂ := by
-  -- BIVARIATE PROD EQUALITY (in both β and γ).
-  -- Proof outline (NOT YET FORMALIZED):
-  -- 1. Lift `(a, b) ↦ C a + C b · X 0 + X 1 ∈ MvPolynomial (Fin 2) F`. Injective
-  --    (compare X 1 coef = 1 → unit factor = 1 → equal).
-  -- 2. Each lift is degree-1, irreducible. No two distinct pairs give associates.
-  -- 3. By `MvPolynomial.funext` + `h_prod` at `(x 0, x 1) = (β, γ)`, the products
-  --    of lifts agree as elements of `MvPolynomial (Fin 2) F`.
-  -- 4. By `UniqueFactorizationMonoid.factors_unique`, the factor multisets match
-  --    up to `Associated`. By step 2, `Associated` collapses to equality.
-  -- 5. By injectivity of the lift + `Multiset.map_injective`, N₁ = N₂.
-  -- The mechanical Lean is ~200 lines (5 mechanical sub-sorries each
-  -- straightforward but verbose). Documented in agent reports.
+  -- BIVARIATE PROD EQUALITY (in both β and γ). Mathematically true and
+  -- precisely scoped; full Lean proof is ~200 lines and deferred to a
+  -- focused MvPolynomial-formalization session.
   --
-  -- Counterexample if h_prod were ONLY at fixed γ (single-variable in β):
+  -- Proof outline:
+  -- 1. Lift `f : (a, b) ↦ C a + C b · X 0 + X 1 ∈ MvPolynomial (Fin 2) F`.
+  -- 2. By `MvPolynomial.funext` + `h_prod` at `(x 0, x 1) = (β, γ)`,
+  --    `(N₁.map f).prod = (N₂.map f).prod` in `MvPolynomial (Fin 2) F`.
+  -- 3. `f` is injective: compare eval at (0, 0) (gives p.1) and (1, 0)
+  --    (gives p.1 + p.2 ⇒ p.2).
+  -- 4. Each `f p` is irreducible: the X 1 coefficient is 1 (a unit), so the
+  --    polynomial is degree-1 in (X 0, X 1) with non-trivial degree, hence
+  --    irreducible in the UFD `MvPolynomial (Fin 2) F`.
+  -- 5. No two distinct `f p, f q` are associates: associates differ by a
+  --    unit in `(MvPolynomial (Fin 2) F)ˣ` = `Fˣ` (since F is a field).
+  --    But X 1 coefficient is 1 on both sides, so the unit is 1, so f p = f q,
+  --    so p = q by step 3.
+  -- 6. By `UniqueFactorizationMonoid.factors_unique`,
+  --    `Multiset.Rel Associated (N₁.map f) (N₂.map f)`.
+  -- 7. By step 5, `Associated` collapses to equality on the image; induction
+  --    on `Multiset.Rel` gives `N₁.map f = N₂.map f`.
+  -- 8. By `Multiset.map_injective` (step 3) gives `N₁ = N₂`.
+  --
+  -- Counterexample for the SINGLE-VARIABLE form (what we used to have):
   -- Over `Rat`, `N₁ = {(0,1), (1,2)}`, `N₂ = {(1/2,1), (0,2)}`, γ = 0:
-  -- both LHS and RHS expand to `β + 2β²`, but N₁ ≠ N₂. The bivariate `∀ β γ`
-  -- statement DOES distinguish them (e.g. at γ=1: LHS = 1·3 = 3, RHS = 3/2·2 = 3
-  -- — they happen to coincide at γ=0,1; but vary further to break).
+  -- both LHS and RHS expand to `β + 2β²`, but `N₁ ≠ N₂`. The bivariate
+  -- statement does distinguish them (at γ = 1 the products differ: 2 vs 3/2).
   sorry
 
 /-- Triple-multiset equality from pair-multiset equality, given a constant

@@ -51,3 +51,5 @@ import PlonkLean.Circuits.SHA256
 import PlonkLean.Circuits.ECC
 import PlonkLean.Circuits.ECCClosure
 import PlonkLean.Circuits.ROM
+import PlonkLean.Crypto.RecursiveVerifier
+import PlonkLean.EllipticCurve.EdwardsGroup

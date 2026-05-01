@@ -27,13 +27,18 @@ import PlonkLean.KZG.PlonkBridge
 import PlonkLean.KZG.SchwartzZippel
 import PlonkLean.KZG.Concrete.Curve
 import PlonkLean.KZG.Concrete.BLS12
+import PlonkLean.KZG.Concrete.BLS12Subgroup
+import PlonkLean.KZG.Concrete.BN254
 import PlonkLean.KZG.ExtractedExample
 import PlonkLean.Crypto.FiatShamir
 import PlonkLean.Crypto.QSDH
 import PlonkLean.Crypto.ZeroKnowledge
+import PlonkLean.Crypto.Simulator
 import PlonkLean.Crypto.Recursive
 import PlonkLean.PCS.FRI
+import PlonkLean.PCS.FRIProximity
 import PlonkLean.Refinement.Halo2
+import PlonkLean.Refinement.Plonky2
 import PlonkLean.KZG.Executable
 import PlonkLean.KZG.Probabilistic
 import PlonkLean.Circuits.Gadgets
@@ -42,5 +47,7 @@ import PlonkLean.Circuits.RangeProof
 import PlonkLean.Circuits.Pedersen
 import PlonkLean.Circuits.Poseidon
 import PlonkLean.Circuits.Keccak
+import PlonkLean.Circuits.SHA256
 import PlonkLean.Circuits.ECC
+import PlonkLean.Circuits.ECCClosure
 import PlonkLean.Circuits.ROM

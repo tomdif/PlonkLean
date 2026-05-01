@@ -53,3 +53,4 @@ import PlonkLean.Circuits.ECCClosure
 import PlonkLean.Circuits.ROM
 import PlonkLean.Crypto.RecursiveVerifier
 import PlonkLean.EllipticCurve.EdwardsGroup
+import PlonkLean.EllipticCurve.SmallCurve

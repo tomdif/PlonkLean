@@ -29,6 +29,11 @@ import PlonkLean.KZG.Concrete.Curve
 import PlonkLean.KZG.Concrete.BLS12
 import PlonkLean.KZG.ExtractedExample
 import PlonkLean.Crypto.FiatShamir
+import PlonkLean.Crypto.QSDH
+import PlonkLean.Crypto.ZeroKnowledge
+import PlonkLean.Crypto.Recursive
+import PlonkLean.PCS.FRI
+import PlonkLean.Refinement.Halo2
 import PlonkLean.KZG.Executable
 import PlonkLean.KZG.Probabilistic
 import PlonkLean.Circuits.Gadgets

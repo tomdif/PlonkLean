@@ -37,3 +37,10 @@ import PlonkLean.Refinement.Halo2
 import PlonkLean.KZG.Executable
 import PlonkLean.KZG.Probabilistic
 import PlonkLean.Circuits.Gadgets
+import PlonkLean.Circuits.Mux
+import PlonkLean.Circuits.RangeProof
+import PlonkLean.Circuits.Pedersen
+import PlonkLean.Circuits.Poseidon
+import PlonkLean.Circuits.Keccak
+import PlonkLean.Circuits.ECC
+import PlonkLean.Circuits.ROM

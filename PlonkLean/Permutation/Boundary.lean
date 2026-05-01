@@ -45,6 +45,15 @@ theorem permBoundary_vanishes_on_domain
     (w : Witness F n) (β γ k1 k2 : F) :
     ∀ i : Fin n, (PlonkLean.permutationBoundaryPoly D σ w β γ k1 k2).eval
         (D.element i) = 0 := by
-  sorry
+  intro i
+  unfold PlonkLean.permutationBoundaryPoly PlonkLean.Permutation.grandProductPoly
+    PlonkLean.lagrangeBasisZero
+  rw [Polynomial.eval_mul, Polynomial.eval_sub, Polynomial.eval_C,
+      PlonkLean.Poly.liftWitness_eval, PlonkLean.Poly.liftWitness_eval]
+  by_cases hi : (i : ℕ) = 0
+  · have hi' : i = ⟨0, hn⟩ := Fin.ext hi
+    rw [hi', PlonkLean.Permutation.grandProductValues_zero D σ w β γ k1 k2 hn,
+        sub_self, zero_mul]
+  · simp [hi]
 
 end PlonkLean.Permutation

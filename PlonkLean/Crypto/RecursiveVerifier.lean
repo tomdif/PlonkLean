@@ -187,7 +187,7 @@ public inputs, the `verifies` predicate of the Plonk verifier circuit is
 unconditionally true. -/
 theorem plonkVerifierCircuit_verifies_trivial
     {n : ℕ}
-    {G₁ G₂ G_T : Type*} [AddCommGroup G₁] [Module F G₁]
+    {G₁ G₂ G_T : Type} [AddCommGroup G₁] [Module F G₁]
     [AddCommGroup G₂] [Module F G₂]
     [AddCommGroup G_T] [Module F G_T]
     (C : Circuit F n) (H : HashGadget F n) (w : Witness F n)
@@ -195,10 +195,10 @@ theorem plonkVerifierCircuit_verifies_trivial
     (hC : C.Satisfies w) :
     let pi : PublicInputs F n 0 := { value := Fin.elim0, row := Fin.elim0 }
     let V := plonkVerifierCircuit (m := 0) G₁ G₂ G_T C pi H
-    V.verifies claim w hC (by intro j; exact j.elim0) := by
+    V.verifies claim w hC (by intro j; exact Fin.elim0 j) := by
   refine ⟨?_, ?_⟩
-  · intro i; exact i.elim0
-  · intro j; exact j.elim0
+  · intro i; exact Fin.elim0 i
+  · intro j; exact Fin.elim0 j
 
 /-! ## Bridge to `RecursiveProof`
 
@@ -212,7 +212,7 @@ with `m = 0`, `k = 0`. Inner = the same base circuit with the same witness.
 This shows the type signatures compose without any cryptographic content. -/
 def trivialPlonkRecursion
     {n : ℕ}
-    (G₁ G₂ G_T : Type*) [AddCommGroup G₁] [Module F G₁]
+    (G₁ G₂ G_T : Type) [AddCommGroup G₁] [Module F G₁]
     [AddCommGroup G₂] [Module F G₂]
     [AddCommGroup G_T] [Module F G_T]
     (C : Circuit F n) (H : HashGadget F n) (w : Witness F n)
@@ -220,7 +220,7 @@ def trivialPlonkRecursion
     (hC : C.Satisfies w) :
     RecursiveProof F :=
   let pi : PublicInputs F n 0 := { value := Fin.elim0, row := Fin.elim0 }
-  let hP : pi.consistent w := fun j => j.elim0
+  let hP : pi.consistent w := fun j => Fin.elim0 j
   { n_inner         := n
     k_inner         := 0
     inner_circuit   := C
@@ -233,13 +233,13 @@ def trivialPlonkRecursion
     inner_claim     := claim
     outer_satisfies := ⟨hC, hP⟩
     faithful        := fun _ => ⟨hC, hP⟩
-    verifies_holds  := ⟨fun i => i.elim0, hP⟩ }
+    verifies_holds  := ⟨fun i => Fin.elim0 i, hP⟩ }
 
 /-- Soundness of the trivial Plonk-verifier recursion: the inner circuit
 is satisfied. -/
 theorem trivialPlonkRecursion_inner_satisfies
     {n : ℕ}
-    (G₁ G₂ G_T : Type*) [AddCommGroup G₁] [Module F G₁]
+    (G₁ G₂ G_T : Type) [AddCommGroup G₁] [Module F G₁]
     [AddCommGroup G₂] [Module F G₂]
     [AddCommGroup G_T] [Module F G_T]
     (C : Circuit F n) (H : HashGadget F n) (w : Witness F n)

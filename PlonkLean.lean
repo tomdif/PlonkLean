@@ -14,3 +14,4 @@ import PlonkLean.Lookup.Plookup
 import PlonkLean.Identity
 import PlonkLean.KZG.Foundations
 import PlonkLean.KZG.Correctness
+import PlonkLean.KZG.Soundness

@@ -1,5 +1,6 @@
 import PlonkLean.Permutation.GrandProduct
 import PlonkLean.Permutation.MultisetEquality
+import PlonkLean.Permutation.Recurrence
 
 /-! # Sub-sub-lemma C4 — recurrence + boundary ↔ multiset equality
 
@@ -113,6 +114,25 @@ private lemma flatten_flatOut (w : Witness F n) (j : Fin n) :
 
 /-! ## Sub-claim 1: recurrence ↔ row-product equality (telescoping) -/
 
+/-- Helper: telescoping for the grand product. -/
+private lemma grandProductValues_mul_denom
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F)
+    (h_denom : ∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0)
+    (i : Fin n) :
+    grandProductValues D σ w β γ k1 k2 i *
+        (∏ j ∈ (Finset.range (i : ℕ)).attach,
+          denom D σ w β γ k1 k2
+            ⟨j.val, Nat.lt_trans (Finset.mem_range.mp j.property) i.is_lt⟩) =
+      ∏ j ∈ (Finset.range (i : ℕ)).attach,
+        num D w β γ k1 k2
+          ⟨j.val, Nat.lt_trans (Finset.mem_range.mp j.property) i.is_lt⟩ := by
+  unfold grandProductValues
+  rw [← Finset.prod_mul_distrib]
+  apply Finset.prod_congr rfl
+  intro j _
+  exact div_mul_cancel₀ _ (h_denom _)
+
 /-- **Sub-claim 1.** Per-row recurrence (with wraparound) plus non-zero
 denominators is equivalent to `∏ num = ∏ denom`. -/
 theorem recurrence_iff_row_product_equality
@@ -124,7 +144,151 @@ theorem recurrence_iff_row_product_equality
         denom D σ w β γ k1 k2 i =
       grandProductValues D σ w β γ k1 k2 i * num D w β γ k1 k2 i) ↔
     (∏ j : Fin n, num D w β γ k1 k2 j = ∏ j : Fin n, denom D σ w β γ k1 k2 j) := by
-  sorry
+  -- ℕ-indexed extensions of num/denom (returning 1 outside [0, n)).
+  let fnum : ℕ → F := fun m =>
+    if hm : m < n then num D w β γ k1 k2 ⟨m, hm⟩ else 1
+  let fdenom : ℕ → F := fun m =>
+    if hm : m < n then denom D σ w β γ k1 k2 ⟨m, hm⟩ else 1
+  -- Bridge `∏ j : Fin n, X j` to `∏ m ∈ range n, fX m`.
+  have hnum_univ : (∏ j : Fin n, num D w β γ k1 k2 j) =
+      ∏ m ∈ Finset.range n, fnum m := by
+    have step : (∏ j : Fin n, num D w β γ k1 k2 j) =
+        ∏ j : Fin n, fnum (j : ℕ) :=
+      Finset.prod_congr rfl (fun j _ => by
+        show num D w β γ k1 k2 j = fnum j.val
+        simp only [fnum, dif_pos j.is_lt])
+    rw [step]
+    exact Fin.prod_univ_eq_prod_range fnum n
+  have hdenom_univ : (∏ j : Fin n, denom D σ w β γ k1 k2 j) =
+      ∏ m ∈ Finset.range n, fdenom m := by
+    have step : (∏ j : Fin n, denom D σ w β γ k1 k2 j) =
+        ∏ j : Fin n, fdenom (j : ℕ) :=
+      Finset.prod_congr rfl (fun j _ => by
+        show denom D σ w β γ k1 k2 j = fdenom j.val
+        simp only [fdenom, dif_pos j.is_lt])
+    rw [step]
+    exact Fin.prod_univ_eq_prod_range fdenom n
+  -- Bridge attach-products to range-products.
+  have hnum_attach : ∀ i : Fin n,
+      (∏ j ∈ (Finset.range (i : ℕ)).attach,
+          num D w β γ k1 k2
+            ⟨j.val, Nat.lt_trans (Finset.mem_range.mp j.property) i.is_lt⟩) =
+        ∏ m ∈ Finset.range (i : ℕ), fnum m := by
+    intro i
+    rw [← Finset.prod_attach (Finset.range (i : ℕ)) fnum]
+    refine Finset.prod_congr rfl (fun j _ => ?_)
+    have hj : (j : ℕ) < n :=
+      Nat.lt_trans (Finset.mem_range.mp j.property) i.is_lt
+    show num D w β γ k1 k2 ⟨j.val, _⟩ = fnum j.val
+    simp only [fnum, dif_pos hj]
+  have hdenom_attach : ∀ i : Fin n,
+      (∏ j ∈ (Finset.range (i : ℕ)).attach,
+          denom D σ w β γ k1 k2
+            ⟨j.val, Nat.lt_trans (Finset.mem_range.mp j.property) i.is_lt⟩) =
+        ∏ m ∈ Finset.range (i : ℕ), fdenom m := by
+    intro i
+    rw [← Finset.prod_attach (Finset.range (i : ℕ)) fdenom]
+    refine Finset.prod_congr rfl (fun j _ => ?_)
+    have hj : (j : ℕ) < n :=
+      Nat.lt_trans (Finset.mem_range.mp j.property) i.is_lt
+    show denom D σ w β γ k1 k2 ⟨j.val, _⟩ = fdenom j.val
+    simp only [fdenom, dif_pos hj]
+  -- Boundary index.
+  have hn_minus_1 : n - 1 < n := Nat.sub_lt hn Nat.one_pos
+  have hn_succ : (n - 1) + 1 = n := by omega
+  let iLast : Fin n := ⟨n - 1, hn_minus_1⟩
+  have hwrap_mod : ((iLast : ℕ) + 1) % n = 0 := by
+    show (n - 1 + 1) % n = 0
+    rw [hn_succ]; exact Nat.mod_self n
+  -- Range-prod splitting at n - 1.
+  have hrange_num : ∏ m ∈ Finset.range n, fnum m =
+      (∏ m ∈ Finset.range (n - 1), fnum m) * fnum (n - 1) := by
+    conv_lhs => rw [← hn_succ]
+    exact Finset.prod_range_succ fnum (n - 1)
+  have hrange_denom : ∏ m ∈ Finset.range n, fdenom m =
+      (∏ m ∈ Finset.range (n - 1), fdenom m) * fdenom (n - 1) := by
+    conv_lhs => rw [← hn_succ]
+    exact Finset.prod_range_succ fdenom (n - 1)
+  have hfnum_last : fnum (n - 1) = num D w β γ k1 k2 iLast := by
+    show (if h : n - 1 < n then num D w β γ k1 k2 ⟨n - 1, h⟩ else 1) =
+         num D w β γ k1 k2 iLast
+    rw [dif_pos hn_minus_1]
+  have hfdenom_last : fdenom (n - 1) = denom D σ w β γ k1 k2 iLast := by
+    show (if h : n - 1 < n then denom D σ w β γ k1 k2 ⟨n - 1, h⟩ else 1) =
+         denom D σ w β γ k1 k2 iLast
+    rw [dif_pos hn_minus_1]
+  refine ⟨fun h_rec => ?_, fun h_prod i => ?_⟩
+  · -- FORWARD: per-row recurrence ⇒ ∏ num = ∏ denom.
+    have h_at_last := h_rec iLast
+    have h_idx_eq :
+        (⟨((iLast : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ : Fin n) = ⟨0, hn⟩ :=
+      Fin.ext hwrap_mod
+    rw [h_idx_eq, grandProductValues_zero, one_mul] at h_at_last
+    -- h_at_last : denom_iLast = Z_iLast * num_iLast.
+    have h_helper := grandProductValues_mul_denom D σ w β γ k1 k2 h_denom iLast
+    rw [hnum_attach iLast, hdenom_attach iLast] at h_helper
+    -- h_helper : Z_iLast * (∏ range(n-1), fdenom) = ∏ range(n-1), fnum.
+    rw [hnum_univ, hdenom_univ, hrange_num, hrange_denom, hfnum_last, hfdenom_last]
+    calc (∏ m ∈ Finset.range (n - 1), fnum m) * num D w β γ k1 k2 iLast
+        = (grandProductValues D σ w β γ k1 k2 iLast *
+            (∏ m ∈ Finset.range (n - 1), fdenom m)) * num D w β γ k1 k2 iLast := by
+          rw [← h_helper]
+      _ = (∏ m ∈ Finset.range (n - 1), fdenom m) *
+            (grandProductValues D σ w β γ k1 k2 iLast * num D w β γ k1 k2 iLast) := by ring
+      _ = (∏ m ∈ Finset.range (n - 1), fdenom m) * denom D σ w β γ k1 k2 iLast := by
+          rw [← h_at_last]
+  · -- BACKWARD: ∏ num = ∏ denom ⇒ per-row recurrence at i.
+    by_cases hilt : (i : ℕ) + 1 < n
+    · -- Non-wraparound case: use grandProductValues_succ.
+      have hmod : ((i : ℕ) + 1) % n = (i : ℕ) + 1 := Nat.mod_eq_of_lt hilt
+      have h_idx_eq :
+          (⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ : Fin n) =
+          ⟨(i : ℕ) + 1, hilt⟩ := Fin.ext hmod
+      rw [h_idx_eq, grandProductValues_succ D σ w β γ k1 k2 i hilt]
+      rw [mul_assoc, div_mul_cancel₀ _ (h_denom i)]
+    · -- Wraparound: i = iLast.
+      have hi_eq : (i : ℕ) + 1 = n := by
+        have hi_lt : (i : ℕ) < n := i.is_lt
+        omega
+      have hi_iLast_val : (i : ℕ) = (iLast : ℕ) := by
+        show (i : ℕ) = n - 1
+        omega
+      have hi_iLast : i = iLast := Fin.ext hi_iLast_val
+      have h_idx_eq :
+          (⟨((i : ℕ) + 1) % n, Nat.mod_lt _ hn⟩ : Fin n) = ⟨0, hn⟩ := by
+        apply Fin.ext
+        show ((i : ℕ) + 1) % n = 0
+        rw [hi_eq]; exact Nat.mod_self n
+      rw [h_idx_eq, grandProductValues_zero, one_mul, hi_iLast]
+      rw [hnum_univ, hdenom_univ] at h_prod
+      rw [hrange_num, hrange_denom, hfnum_last, hfdenom_last] at h_prod
+      have h_helper := grandProductValues_mul_denom D σ w β γ k1 k2 h_denom iLast
+      rw [hnum_attach iLast, hdenom_attach iLast] at h_helper
+      have h_prod_denom_ne :
+          (∏ m ∈ Finset.range (n - 1), fdenom m) ≠ 0 := by
+        rw [Finset.prod_ne_zero_iff]
+        intro m hm
+        have hmlt : m < n - 1 := Finset.mem_range.mp hm
+        have hmlt' : m < n := by omega
+        show fdenom m ≠ 0
+        simp only [fdenom, dif_pos hmlt']
+        exact h_denom ⟨m, hmlt'⟩
+      have hcombine :
+          (∏ m ∈ Finset.range (n - 1), fdenom m) *
+            (grandProductValues D σ w β γ k1 k2 iLast * num D w β γ k1 k2 iLast) =
+          (∏ m ∈ Finset.range (n - 1), fdenom m) *
+            denom D σ w β γ k1 k2 iLast := by
+        calc (∏ m ∈ Finset.range (n - 1), fdenom m) *
+              (grandProductValues D σ w β γ k1 k2 iLast *
+                num D w β γ k1 k2 iLast)
+            = (grandProductValues D σ w β γ k1 k2 iLast *
+                (∏ m ∈ Finset.range (n - 1), fdenom m)) *
+                num D w β γ k1 k2 iLast := by ring
+          _ = (∏ m ∈ Finset.range (n - 1), fnum m) *
+                num D w β γ k1 k2 iLast := by rw [h_helper]
+          _ = (∏ m ∈ Finset.range (n - 1), fdenom m) *
+                denom D σ w β γ k1 k2 iLast := h_prod
+      exact (mul_left_cancel₀ h_prod_denom_ne hcombine).symm
 
 /-! ## Sub-claim 2: row-product as multiset product (identity side) -/
 

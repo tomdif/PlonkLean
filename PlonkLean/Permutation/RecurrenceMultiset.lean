@@ -494,36 +494,64 @@ end PolynomialGammaExtension
 
 /-! ## Sub-claim 4: multiset products equal for all β ⇒ multisets equal -/
 
-/-- Auxiliary: the bivariate prod equality lifts to an `MvPolynomial (Fin 2) F`
-identity via the lift `f p = C p.1 + C p.2 · X 0 + X 1`. -/
-private lemma bivariate_prod_eq_lifts
-    [Infinite F]
-    (N₁ N₂ : Multiset (F × F))
-    (h_prod : ∀ β γ : F,
+/-- **Step 1**: For fixed β, bivariate equality (varying γ) implies
+multiset equality of the F-valued projections `p ↦ p.1 + β·p.2`. -/
+private lemma multiset_proj_eq_of_prod_eq
+    [Infinite F] (β : F) (N₁ N₂ : Multiset (F × F))
+    (h : ∀ γ : F,
       (N₁.map fun p => p.1 + β * p.2 + γ).prod =
       (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
-    let f : F × F → MvPolynomial (Fin 2) F := fun p =>
-      MvPolynomial.C p.1 + MvPolynomial.C p.2 * MvPolynomial.X 0 + MvPolynomial.X 1
-    (N₁.map f).prod = (N₂.map f).prod := by
-  intro f
-  apply MvPolynomial.funext
-  intro x
-  have h_eval : ∀ p : F × F,
-      MvPolynomial.eval x (f p) = p.1 + (x 0) * p.2 + (x 1) := by
-    intro p
-    simp [f, MvPolynomial.eval_add, MvPolynomial.eval_mul, MvPolynomial.eval_C,
-          MvPolynomial.eval_X, mul_comm]
-  rw [show MvPolynomial.eval x ((N₁.map f).prod) =
-         ((N₁.map f).map (MvPolynomial.eval x)).prod from
-       (Multiset.prod_hom (N₁.map f) (MvPolynomial.eval x).toMonoidHom).symm,
-      show MvPolynomial.eval x ((N₂.map f).prod) =
-         ((N₂.map f).map (MvPolynomial.eval x)).prod from
-       (Multiset.prod_hom (N₂.map f) (MvPolynomial.eval x).toMonoidHom).symm]
-  rw [Multiset.map_map, Multiset.map_map]
-  have ee : (MvPolynomial.eval x ∘ f) = fun p => p.1 + (x 0) * p.2 + (x 1) := by
-    funext p; exact h_eval p
-  rw [ee]
-  exact h_prod (x 0) (x 1)
+    N₁.map (fun p => p.1 + β * p.2) = N₂.map (fun p => p.1 + β * p.2) := by
+  -- gβ p = X - C(-(p.1 + β·p.2)) is monic linear in F[X].
+  set gβ : F × F → Polynomial F := fun p =>
+    Polynomial.X - Polynomial.C (-(p.1 + β * p.2)) with hgβ
+  -- Step 1a: (N₁.map gβ).prod = (N₂.map gβ).prod via eq_of_infinite_eval_eq.
+  have heval : ∀ M : Multiset (F × F), ∀ γ : F,
+      Polynomial.eval γ (M.map gβ).prod
+        = (M.map (fun p => p.1 + β * p.2 + γ)).prod := by
+    intro M γ
+    have h1 : Polynomial.eval γ ((M.map gβ).prod)
+            = ((M.map gβ).map
+                (Polynomial.evalRingHom γ).toMonoidHom).prod :=
+      (Multiset.prod_hom (M.map gβ) (Polynomial.evalRingHom γ).toMonoidHom).symm
+    rw [h1, Multiset.map_map]
+    apply congrArg Multiset.prod
+    apply Multiset.map_congr rfl
+    intro p _
+    show (Polynomial.evalRingHom γ) (gβ p) = p.1 + β * p.2 + γ
+    rw [Polynomial.coe_evalRingHom]
+    simp [hgβ, Polynomial.eval_sub, Polynomial.eval_X, Polynomial.eval_C]
+    ring
+  have h_polyeq : (N₁.map gβ).prod = (N₂.map gβ).prod := by
+    apply Polynomial.eq_of_infinite_eval_eq
+    have h_set : { γ : F | Polynomial.eval γ (N₁.map gβ).prod
+                         = Polynomial.eval γ (N₂.map gβ).prod } = Set.univ := by
+      ext γ
+      simp only [Set.mem_setOf_eq, Set.mem_univ, iff_true]
+      rw [heval N₁ γ, heval N₂ γ]
+      exact h γ
+    rw [h_set]
+    exact Set.infinite_univ
+  -- Step 1b: extract root multisets via roots_multiset_prod_X_sub_C.
+  have h_id : ∀ M : Multiset (F × F),
+      (M.map gβ).prod.roots = M.map (fun p => -(p.1 + β * p.2)) := by
+    intro M
+    have h1 : M.map gβ
+            = (M.map (fun p => -(p.1 + β * p.2))).map
+                (fun a => Polynomial.X - Polynomial.C a) := by
+      rw [Multiset.map_map]; rfl
+    rw [h1, Polynomial.roots_multiset_prod_X_sub_C]
+  have h_neg_eq : N₁.map (fun p => -(p.1 + β * p.2))
+                = N₂.map (fun p => -(p.1 + β * p.2)) := by
+    have := congrArg Polynomial.roots h_polyeq
+    rwa [h_id N₁, h_id N₂] at this
+  -- Cancel the negation (Neg.neg is injective in F).
+  have h_factored : ∀ M : Multiset (F × F),
+      M.map (fun p => -(p.1 + β * p.2))
+        = (M.map (fun p => p.1 + β * p.2)).map (Neg.neg : F → F) := by
+    intro M; rw [Multiset.map_map]; rfl
+  rw [h_factored N₁, h_factored N₂] at h_neg_eq
+  exact Multiset.map_injective neg_injective h_neg_eq
 
 theorem pair_multiset_eq_of_y_match_and_prod_eq
     [Infinite F]
@@ -532,34 +560,101 @@ theorem pair_multiset_eq_of_y_match_and_prod_eq
       (N₁.map fun p => p.1 + β * p.2 + γ).prod =
       (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
     N₁ = N₂ := by
-  -- BIVARIATE PROD EQUALITY (in both β and γ). Mathematically true and
-  -- precisely scoped; full Lean proof is ~200 lines and deferred to a
-  -- focused MvPolynomial-formalization session.
-  --
-  -- Proof outline:
-  -- 1. Lift `f : (a, b) ↦ C a + C b · X 0 + X 1 ∈ MvPolynomial (Fin 2) F`.
-  -- 2. By `MvPolynomial.funext` + `h_prod` at `(x 0, x 1) = (β, γ)`,
-  --    `(N₁.map f).prod = (N₂.map f).prod` in `MvPolynomial (Fin 2) F`.
-  -- 3. `f` is injective: compare eval at (0, 0) (gives p.1) and (1, 0)
-  --    (gives p.1 + p.2 ⇒ p.2).
-  -- 4. Each `f p` is irreducible: the X 1 coefficient is 1 (a unit), so the
-  --    polynomial is degree-1 in (X 0, X 1) with non-trivial degree, hence
-  --    irreducible in the UFD `MvPolynomial (Fin 2) F`.
-  -- 5. No two distinct `f p, f q` are associates: associates differ by a
-  --    unit in `(MvPolynomial (Fin 2) F)ˣ` = `Fˣ` (since F is a field).
-  --    But X 1 coefficient is 1 on both sides, so the unit is 1, so f p = f q,
-  --    so p = q by step 3.
-  -- 6. By `UniqueFactorizationMonoid.factors_unique`,
-  --    `Multiset.Rel Associated (N₁.map f) (N₂.map f)`.
-  -- 7. By step 5, `Associated` collapses to equality on the image; induction
-  --    on `Multiset.Rel` gives `N₁.map f = N₂.map f`.
-  -- 8. By `Multiset.map_injective` (step 3) gives `N₁ = N₂`.
-  --
-  -- Counterexample for the SINGLE-VARIABLE form (what we used to have):
-  -- Over `Rat`, `N₁ = {(0,1), (1,2)}`, `N₂ = {(1/2,1), (0,2)}`, γ = 0:
-  -- both LHS and RHS expand to `β + 2β²`, but `N₁ ≠ N₂`. The bivariate
-  -- statement does distinguish them (at γ = 1 the products differ: 2 vs 3/2).
-  sorry
+  classical
+  -- Step 1: per-β multiset equality of (p.1 + β·p.2)-projections.
+  have step1 : ∀ β : F,
+      N₁.map (fun p => p.1 + β * p.2)
+        = N₂.map (fun p => p.1 + β * p.2) :=
+    fun β => multiset_proj_eq_of_prod_eq β N₁ N₂ (h_prod β)
+  -- Step 2: counting argument with a generic β.
+  refine Multiset.ext.mpr (fun p₀ => ?_)
+  -- Combined finite support.
+  set S : Finset (F × F) := N₁.toFinset ∪ N₂.toFinset with hS
+  -- Case: p₀ outside the combined support → both counts are zero.
+  by_cases h_p₀ : p₀ ∈ S
+  · -- p₀ ∈ S. Find β where f_β := (·.1 + β·.2) is InjOn S.
+    -- For each (q₁, q₂) ∈ S.offDiag, the polynomial
+    --   h_pair(q₁, q₂)(X) := C(q₁.1 - q₂.1) + C(q₁.2 - q₂.2) · X
+    -- is non-zero (q₁ ≠ q₂), and its unique root (if any) is the β making
+    -- f_β q₁ = f_β q₂.
+    let h_pair : (F × F) × (F × F) → Polynomial F := fun pq =>
+      Polynomial.C (pq.1.1 - pq.2.1) + Polynomial.C (pq.1.2 - pq.2.2) * Polynomial.X
+    have h_pair_ne_zero : ∀ pq : (F × F) × (F × F),
+        pq.1 ≠ pq.2 → h_pair pq ≠ 0 := by
+      intro pq h_ne h0
+      apply h_ne
+      have hc0 : (h_pair pq).coeff 0 = pq.1.1 - pq.2.1 := by
+        show ((Polynomial.C (pq.1.1 - pq.2.1) + Polynomial.C (pq.1.2 - pq.2.2) *
+          Polynomial.X)).coeff 0 = pq.1.1 - pq.2.1
+        simp [Polynomial.coeff_add, Polynomial.coeff_C, Polynomial.coeff_C_mul,
+              Polynomial.coeff_X]
+      have hc1 : (h_pair pq).coeff 1 = pq.1.2 - pq.2.2 := by
+        show ((Polynomial.C (pq.1.1 - pq.2.1) + Polynomial.C (pq.1.2 - pq.2.2) *
+          Polynomial.X)).coeff 1 = pq.1.2 - pq.2.2
+        simp [Polynomial.coeff_add, Polynomial.coeff_C, Polynomial.coeff_C_mul,
+              Polynomial.coeff_X]
+      rw [h0, Polynomial.coeff_zero] at hc0 hc1
+      have h1 : pq.1.1 = pq.2.1 := sub_eq_zero.mp hc0.symm
+      have h2 : pq.1.2 = pq.2.2 := sub_eq_zero.mp hc1.symm
+      exact Prod.ext h1 h2
+    have h_pair_eval : ∀ pq : (F × F) × (F × F), ∀ β : F,
+        (h_pair pq).eval β
+          = (pq.1.1 + β * pq.1.2) - (pq.2.1 + β * pq.2.2) := by
+      intro pq β
+      show ((Polynomial.C (pq.1.1 - pq.2.1) + Polynomial.C (pq.1.2 - pq.2.2) *
+        Polynomial.X)).eval β = _
+      simp [Polynomial.eval_add, Polynomial.eval_C,
+            Polynomial.eval_mul, Polynomial.eval_X]
+      ring
+    -- Bad set: roots of h_pair over (q₁, q₂) ∈ S.offDiag.
+    let badFinset : Finset F :=
+      S.offDiag.biUnion fun pq => (h_pair pq).roots.toFinset
+    have h_compl_inf :
+        (Set.univ \ (badFinset : Set F) : Set F).Infinite :=
+      Set.infinite_univ.diff badFinset.finite_toSet
+    obtain ⟨β, ⟨_, hβ_not_bad⟩⟩ := h_compl_inf.nonempty
+    -- f_β is InjOn S.
+    have h_inj : Set.InjOn (fun p : F × F => p.1 + β * p.2) (S : Set (F × F)) := by
+      intro q₁ hq₁ q₂ hq₂ h_eq
+      by_contra h_ne
+      apply hβ_not_bad
+      show β ∈ badFinset
+      refine Finset.mem_biUnion.mpr ⟨(q₁, q₂), ?_, ?_⟩
+      · exact Finset.mem_offDiag.mpr ⟨hq₁, hq₂, h_ne⟩
+      · rw [Multiset.mem_toFinset, Polynomial.mem_roots
+              (h_pair_ne_zero (q₁, q₂) h_ne)]
+        show (h_pair (q₁, q₂)).IsRoot β
+        unfold Polynomial.IsRoot
+        rw [h_pair_eval (q₁, q₂) β, sub_eq_zero]
+        exact h_eq
+    -- Now count_map_eq_count via filter_congr.
+    have h_subset_N₁ : N₁.toFinset ⊆ S := Finset.subset_union_left
+    have h_subset_N₂ : N₂.toFinset ⊆ S := Finset.subset_union_right
+    have h_count_eq : ∀ N : Multiset (F × F), N.toFinset ⊆ S →
+        Multiset.count p₀ N
+          = Multiset.count (p₀.1 + β * p₀.2)
+              (N.map (fun p : F × F => p.1 + β * p.2)) := by
+      intro N hN
+      rw [Multiset.count_map, Multiset.count_eq_card_filter_eq]
+      apply congrArg Multiset.card
+      apply Multiset.filter_congr
+      intro q hq
+      have hq_S : q ∈ (S : Set (F × F)) := hN (Multiset.mem_toFinset.mpr hq)
+      constructor
+      · intro h_eq
+        rw [h_eq]
+      · intro h_eq
+        exact h_inj h_p₀ hq_S h_eq
+    rw [h_count_eq N₁ h_subset_N₁, h_count_eq N₂ h_subset_N₂]
+    have hstep : N₁.map (fun p : F × F => p.1 + β * p.2)
+               = N₂.map (fun p : F × F => p.1 + β * p.2) := step1 β
+    rw [hstep]
+  · -- p₀ ∉ S: count p₀ N₁ = 0 = count p₀ N₂.
+    have h_p₁ : p₀ ∉ N₁ := fun h =>
+      h_p₀ (Finset.mem_union.mpr (Or.inl (Multiset.mem_toFinset.mpr h)))
+    have h_p₂ : p₀ ∉ N₂ := fun h =>
+      h_p₀ (Finset.mem_union.mpr (Or.inr (Multiset.mem_toFinset.mpr h)))
+    rw [Multiset.count_eq_zero.mpr h_p₁, Multiset.count_eq_zero.mpr h_p₂]
 
 /-- Triple-multiset equality from pair-multiset equality, given a constant
 third coordinate on both sides. Pure bookkeeping. -/

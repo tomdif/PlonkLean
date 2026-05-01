@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/Users/thomasdifiore/PlonkLean/**)",
+      "Write(/Users/thomasdifiore/PlonkLean/**)",
+      "Read(/Users/thomasdifiore/PlonkLean/**)",
+      "Bash(lake build*)",
+      "Bash(cd /Users/thomasdifiore/PlonkLean && lake build*)"
+    ]
+  }
+}

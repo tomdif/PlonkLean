@@ -77,6 +77,50 @@ theorem multiset_equality_iff_copyConstraints
     (h_idValue_inj : Function.Injective (idValue D k1 k2)) :
     idMultiset D w k1 k2 γ = sigmaMultiset D σ w k1 k2 γ ↔
     CopyConstraints σ w := by
-  sorry
+  constructor
+  · -- Forward: multiset equality + injectivity → copy constraints.
+    intro h_eq i
+    -- Apply membership at σ i directly to extract the form we need.
+    have h_mem : (w.flatten (σ i), idValue D k1 k2 (σ i), γ) ∈
+        sigmaMultiset D σ w k1 k2 γ := by
+      rw [← h_eq]
+      unfold idMultiset
+      rw [Multiset.mem_map]
+      exact ⟨σ i, Finset.mem_univ_val _, rfl⟩
+    unfold sigmaMultiset at h_mem
+    rw [Multiset.mem_map] at h_mem
+    obtain ⟨j, _, h_triple⟩ := h_mem
+    simp only [Prod.mk.injEq] at h_triple
+    obtain ⟨h_w_eq, h_id_part, _⟩ := h_triple
+    have h_sigma_j : σ j = σ i := h_idValue_inj <| by
+      simpa [sigmaValue] using h_id_part
+    have h_j : j = i := σ.injective h_sigma_j
+    rw [h_j] at h_w_eq
+    exact h_w_eq.symm
+  · -- Reverse: copy constraints → multiset equality.
+    intro h_copy
+    unfold idMultiset sigmaMultiset
+    have h_sigma_rw : (Finset.univ : Finset (Fin (3 * n))).val.map
+          (fun i => (w.flatten i, sigmaValue D σ k1 k2 i, γ)) =
+        (Finset.univ : Finset (Fin (3 * n))).val.map
+          (fun i => (w.flatten (σ i), idValue D k1 k2 (σ i), γ)) := by
+      apply Multiset.map_congr rfl
+      intro i _
+      simp [sigmaValue, h_copy i]
+    rw [h_sigma_rw]
+    have h_univ : ((Finset.univ : Finset (Fin (3 * n))).val.map
+          (σ : Fin (3 * n) → Fin (3 * n))) =
+        (Finset.univ : Finset (Fin (3 * n))).val :=
+      Multiset.map_univ_val_equiv (σ : Equiv.Perm (Fin (3 * n)))
+    symm
+    calc (Finset.univ : Finset (Fin (3 * n))).val.map
+            (fun i => (w.flatten (σ i), idValue D k1 k2 (σ i), γ))
+        = ((Finset.univ : Finset (Fin (3 * n))).val.map
+            (σ : Fin (3 * n) → Fin (3 * n))).map
+            (fun j => (w.flatten j, idValue D k1 k2 j, γ)) := by
+              rw [Multiset.map_map]; rfl
+      _ = (Finset.univ : Finset (Fin (3 * n))).val.map
+            (fun j => (w.flatten j, idValue D k1 k2 j, γ)) := by
+              rw [h_univ]
 
 end PlonkLean.Permutation

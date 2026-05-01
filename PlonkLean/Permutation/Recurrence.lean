@@ -6,29 +6,6 @@ The permutation main identity polynomial vanishes on the entire evaluation
 domain `H` iff the grand product `Z` satisfies the per-row recurrence
   `Z(ω^{i+1}) · denom(ω^i) = Z(ω^i) · num(ω^i)`
 for every `i ∈ Fin n` (with `i+1` taken modulo `n` to wrap at the boundary).
-
-This is one of four sub-sub-lemmas decomposing `permutation_vanishes_iff`
-(the deep Plonk paper §5 result).
-
-Key observations:
-* `permutationMainPoly = Z(ω·X) · denom(X) - Z(X) · num(X)`.
-* Evaluated at `ω^i`:
-  - `Z(ω · ω^i) = Z(ω^{i+1})` — the "next" domain point.
-  - `denom(ω^i) = denominatorPoly evaluated at row i` — this is the per-row
-    `denom` value computed from witness, σ, β, γ, k₁, k₂.
-  - `num(ω^i)` similarly.
-* So the polynomial vanishes at `ω^i` iff
-  `Z(ω^{i+1}) · denom(ω^i) - Z(ω^i) · num(ω^i) = 0`.
-
-The forward direction (recurrence holds → polynomial vanishes) is the
-easier half. The reverse direction requires more careful unpacking but is
-also tractable.
-
-For the canonical Plonk grand product (`grandProductPoly`), the recurrence
-holds *by construction* (provided denominators are nonzero), since
-`grandProductValues` is defined as the telescoping product. So this lemma
-should reduce to verifying that the polynomial-level identity faithfully
-encodes the value-level recurrence.
 -/
 
 namespace PlonkLean.Permutation
@@ -37,25 +14,111 @@ open PlonkLean.Arithmetization
 
 variable {F : Type*} [Field F] {n : ℕ}
 
-/-- **Sub-sub-lemma C2 (recurrence equivalence, half-direction).**
+/-! ## Helper lemmas for the recurrence theorem -/
 
-For the canonical Plonk grand product with non-zero denominators at every
-row, the permutation main identity polynomial vanishes on the evaluation
-domain — *provided the wraparound condition holds at the final row*.
+/-- `grandProductPoly` evaluated at `D.element i` recovers the prescribed value. -/
+lemma grandProductPoly_eval
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F) (i : Fin n) :
+    (grandProductPoly D σ w β γ k1 k2).eval (D.element i) =
+      grandProductValues D σ w β γ k1 k2 i := by
+  unfold grandProductPoly
+  exact PlonkLean.Poly.liftWitness_eval D _ i
 
-**Statement note (corrected):** the original `h_denom`-only hypothesis is
-insufficient — at row `i = n-1` the recurrence reduces to a wraparound
-condition `Z(ω^n) · denom(n-1) = Z(ω^(n-1)) · num(n-1)` (with
-`ω^n = ω^0`), which is exactly the multiset-equality channel handled by
-sub-sub-lemma C4 (`RecurrenceMultiset.lean`). We therefore add an
-`h_wrap` hypothesis isolating that boundary row; sub-sub-lemma C4 then
-proves `h_wrap` is equivalent to the multiset equality, completing the
-permutation argument when both lemmas are composed.
+/-- `idValue` at `flatLeft j` simplifies to `D.element j`. -/
+lemma idValue_flatLeft
+    (D : PlonkLean.EvaluationDomain F n) (k1 k2 : F) (j : Fin n) :
+    idValue D k1 k2 (flatLeft j) = D.element j := by
+  unfold idValue flatLeft decompose cosetRep
+  have hj : (j : ℕ) < n := j.is_lt
+  simp [hj]
 
-For non-boundary rows `(i.val + 1) < n`, the polynomial identity follows
-from the telescoping definition of `grandProductValues` (using `h_denom`
-to invert denominators).
--/
+/-- `idValue` at `flatRight j` simplifies to `k1 * D.element j`. -/
+lemma idValue_flatRight
+    (D : PlonkLean.EvaluationDomain F n) (k1 k2 : F) (j : Fin n) :
+    idValue D k1 k2 (flatRight j) = k1 * D.element j := by
+  unfold idValue flatRight decompose cosetRep EvaluationDomain.element
+  have hj : (j : ℕ) < n := j.is_lt
+  have h1 : ¬ ((j : ℕ) + n < n) := by omega
+  have h2 : (j : ℕ) + n < 2 * n := by omega
+  simp [h1, h2]
+
+/-- `idValue` at `flatOut j` simplifies to `k2 * D.element j`. -/
+lemma idValue_flatOut
+    (D : PlonkLean.EvaluationDomain F n) (k1 k2 : F) (j : Fin n) :
+    idValue D k1 k2 (flatOut j) = k2 * D.element j := by
+  unfold idValue flatOut decompose cosetRep EvaluationDomain.element
+  have hj : (j : ℕ) < n := j.is_lt
+  have h1 : ¬ ((j : ℕ) + 2 * n < n) := by omega
+  have h2 : ¬ ((j : ℕ) + 2 * n < 2 * n) := by omega
+  simp [h1, h2]
+
+/-- `numeratorPoly` evaluates to `num` at every domain point. -/
+lemma numeratorPoly_eval
+    (D : PlonkLean.EvaluationDomain F n) (w : Witness F n)
+    (β γ k1 k2 : F) (i : Fin n) :
+    (PlonkLean.numeratorPoly D w β γ k1 k2).eval (D.element i) =
+      num D w β γ k1 k2 i := by
+  unfold PlonkLean.numeratorPoly num
+  simp only [Polynomial.eval_add, Polynomial.eval_mul, Polynomial.eval_C,
+             Polynomial.eval_X, PlonkLean.witnessPolyA_eval,
+             PlonkLean.witnessPolyB_eval, PlonkLean.witnessPolyC_eval]
+  rw [idValue_flatLeft, idValue_flatRight, idValue_flatOut]
+  ring
+
+/-- `denominatorPoly` evaluates to `denom` at every domain point. -/
+lemma denominatorPoly_eval
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F) (i : Fin n) :
+    (PlonkLean.denominatorPoly D σ w β γ k1 k2).eval (D.element i) =
+      denom D σ w β γ k1 k2 i := by
+  unfold PlonkLean.denominatorPoly denom
+  unfold PlonkLean.sigmaPolyA PlonkLean.sigmaPolyB PlonkLean.sigmaPolyC
+  simp only [Polynomial.eval_add, Polynomial.eval_mul, Polynomial.eval_C,
+             PlonkLean.witnessPolyA_eval, PlonkLean.witnessPolyB_eval,
+             PlonkLean.witnessPolyC_eval, PlonkLean.Poly.liftWitness_eval,
+             PlonkLean.sigmaValuesA, PlonkLean.sigmaValuesB,
+             PlonkLean.sigmaValuesC, sigmaValue]
+
+/-- `grandProductShifted` evaluated at `D.element i` equals
+`grandProductPoly` at `D.ω ^ (i+1)`. -/
+lemma grandProductShifted_eval
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F) (i : Fin n) :
+    (PlonkLean.grandProductShifted D σ w β γ k1 k2).eval (D.element i) =
+      (grandProductPoly D σ w β γ k1 k2).eval (D.ω ^ ((i : ℕ) + 1)) := by
+  unfold PlonkLean.grandProductShifted EvaluationDomain.element
+  rw [Polynomial.eval_comp]
+  simp [pow_succ]
+  ring
+
+/-- For `(i.val + 1) < n`, the grand product values telescope:
+`Z (i+1) = Z i * num i / denom i`.
+TODO: the proof has a recursive `simp` issue with the `set f := ...` pattern;
+left as `sorry` pending a cleaner formulation (likely using `Finset.prod_range_succ`
+on a non-`set`-bound function). -/
+lemma grandProductValues_succ
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F) (i : Fin n) (h : (i : ℕ) + 1 < n) :
+    grandProductValues D σ w β γ k1 k2 ⟨(i : ℕ) + 1, h⟩ =
+      grandProductValues D σ w β γ k1 k2 i *
+        (num D w β γ k1 k2 i / denom D σ w β γ k1 k2 i) := by
+  sorry
+
+/-- For non-boundary rows `(i+1) < n`, the polynomial recurrence holds. -/
+lemma recurrence_lt_last
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F)
+    (h_denom : ∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0)
+    (i : Fin n) (h : (i : ℕ) + 1 < n) :
+    (grandProductPoly D σ w β γ k1 k2).eval (D.ω ^ ((i : ℕ) + 1)) *
+      denom D σ w β γ k1 k2 i =
+    grandProductValues D σ w β γ k1 k2 i * num D w β γ k1 k2 i := by
+  have h1 : D.ω ^ ((i : ℕ) + 1) = D.element ⟨(i : ℕ) + 1, h⟩ := rfl
+  rw [h1, grandProductPoly_eval, grandProductValues_succ _ _ _ _ _ _ _ _ h]
+  rw [mul_assoc, div_mul_cancel₀ _ (h_denom i)]
+
+/-- **Sub-sub-lemma C2 (recurrence equivalence, half-direction).** -/
 theorem permMain_vanishes_on_domain
     (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
     (β γ k1 k2 : F)
@@ -67,6 +130,17 @@ theorem permMain_vanishes_on_domain
       grandProductValues D σ w β γ k1 k2 i * num D w β γ k1 k2 i) :
     ∀ i : Fin n, (PlonkLean.permutationMainPoly D σ w β γ k1 k2).eval
         (D.element i) = 0 := by
-  sorry
+  intro i
+  unfold PlonkLean.permutationMainPoly
+  rw [Polynomial.eval_sub, Polynomial.eval_mul, Polynomial.eval_mul,
+      grandProductShifted_eval, denominatorPoly_eval,
+      grandProductPoly_eval, numeratorPoly_eval]
+  rw [sub_eq_zero]
+  by_cases h : (i : ℕ) + 1 < n
+  · exact recurrence_lt_last D σ w β γ k1 k2 h_denom i h
+  · have hi : (i : ℕ) + 1 = n := by
+      have hi_lt : (i : ℕ) < n := i.is_lt
+      omega
+    exact h_wrap i hi
 
 end PlonkLean.Permutation

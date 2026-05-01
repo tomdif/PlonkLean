@@ -512,14 +512,29 @@ for the polynomial-roots argument. In Plonk, `idValue` outputs lie in
 `H ∪ k₁H ∪ k₂H ⊂ F^*` so the y-nonzero condition holds when `k₁, k₂ ≠ 0`. -/
 theorem pair_multiset_eq_of_y_match_and_prod_eq
     [Infinite F]
-    (N₁ N₂ : Multiset (F × F)) (γ : F)
-    (h_card : N₁.card = N₂.card)
-    (h_y_match : N₁.map Prod.snd = N₂.map Prod.snd)
-    (h_y_nonzero : ∀ p ∈ N₁, p.2 ≠ 0)
-    (h_prod : ∀ β : F, β ≠ 0 →
+    (N₁ N₂ : Multiset (F × F))
+    (h_prod : ∀ β γ : F,
       (N₁.map fun p => p.1 + β * p.2 + γ).prod =
       (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
     N₁ = N₂ := by
+  -- BIVARIATE PROD EQUALITY (in both β and γ).
+  -- Proof outline (NOT YET FORMALIZED):
+  -- 1. Lift `(a, b) ↦ C a + C b · X 0 + X 1 ∈ MvPolynomial (Fin 2) F`. Injective
+  --    (compare X 1 coef = 1 → unit factor = 1 → equal).
+  -- 2. Each lift is degree-1, irreducible. No two distinct pairs give associates.
+  -- 3. By `MvPolynomial.funext` + `h_prod` at `(x 0, x 1) = (β, γ)`, the products
+  --    of lifts agree as elements of `MvPolynomial (Fin 2) F`.
+  -- 4. By `UniqueFactorizationMonoid.factors_unique`, the factor multisets match
+  --    up to `Associated`. By step 2, `Associated` collapses to equality.
+  -- 5. By injectivity of the lift + `Multiset.map_injective`, N₁ = N₂.
+  -- The mechanical Lean is ~200 lines (5 mechanical sub-sorries each
+  -- straightforward but verbose). Documented in agent reports.
+  --
+  -- Counterexample if h_prod were ONLY at fixed γ (single-variable in β):
+  -- Over `Rat`, `N₁ = {(0,1), (1,2)}`, `N₂ = {(1/2,1), (0,2)}`, γ = 0:
+  -- both LHS and RHS expand to `β + 2β²`, but N₁ ≠ N₂. The bivariate `∀ β γ`
+  -- statement DOES distinguish them (e.g. at γ=1: LHS = 1·3 = 3, RHS = 3/2·2 = 3
+  -- — they happen to coincide at γ=0,1; but vary further to break).
   sorry
 
 /-- Triple-multiset equality from pair-multiset equality, given a constant
@@ -552,49 +567,16 @@ Composes `pair_multiset_eq_of_y_match_and_prod_eq` (deep) with
 theorem multiset_prod_eq_iff_multiset_eq
     [Infinite F]
     (M₁ M₂ : Multiset (F × F × F)) (γ : F)
-    (h_card : M₁.card = M₂.card)
-    (h_y_match : M₁.map (fun t => t.2.1) = M₂.map (fun t => t.2.1))
-    (h_y_nonzero : ∀ t ∈ M₁, t.2.1 ≠ 0)
     (h₁_const : ∀ t ∈ M₁, t.2.2 = γ)
     (h₂_const : ∀ t ∈ M₂, t.2.2 = γ)
-    (h_prod : ∀ β : F, β ≠ 0 →
-      (M₁.map fun t => t.1 + β * t.2.1 + t.2.2).prod =
-      (M₂.map fun t => t.1 + β * t.2.1 + t.2.2).prod) :
+    (h_prod_biv : ∀ β γ' : F,
+      ((M₁.map (fun t => (t.1, t.2.1))).map (fun p => p.1 + β * p.2 + γ')).prod =
+      ((M₂.map (fun t => (t.1, t.2.1))).map (fun p => p.1 + β * p.2 + γ')).prod) :
     M₁ = M₂ := by
   set N₁ : Multiset (F × F) := M₁.map (fun t => (t.1, t.2.1)) with hN₁
   set N₂ : Multiset (F × F) := M₂.map (fun t => (t.1, t.2.1)) with hN₂
-  have hN_card : N₁.card = N₂.card := by simp [hN₁, hN₂, h_card]
-  have hN_y : N₁.map Prod.snd = N₂.map Prod.snd := by
-    simp only [hN₁, hN₂, Multiset.map_map]
-    exact h_y_match
-  have hN_y_nonzero : ∀ p ∈ N₁, p.2 ≠ 0 := by
-    intro p hp
-    simp only [hN₁, Multiset.mem_map] at hp
-    obtain ⟨t, ht, ht_eq⟩ := hp
-    rw [← ht_eq]
-    exact h_y_nonzero t ht
-  have hN_prod : ∀ β : F, β ≠ 0 →
-      (N₁.map fun p => p.1 + β * p.2 + γ).prod =
-      (N₂.map fun p => p.1 + β * p.2 + γ).prod := by
-    intro β hβ
-    have e₁ : (M₁.map fun t => t.1 + β * t.2.1 + t.2.2) =
-              N₁.map fun p => p.1 + β * p.2 + γ := by
-      simp only [hN₁, Multiset.map_map]
-      refine Multiset.map_congr rfl ?_
-      intro t ht
-      have h3 := h₁_const t ht
-      simp [h3]
-    have e₂ : (M₂.map fun t => t.1 + β * t.2.1 + t.2.2) =
-              N₂.map fun p => p.1 + β * p.2 + γ := by
-      simp only [hN₂, Multiset.map_map]
-      refine Multiset.map_congr rfl ?_
-      intro t ht
-      have h3 := h₂_const t ht
-      simp [h3]
-    rw [← e₁, ← e₂]
-    exact h_prod β hβ
   have hN_eq : N₁ = N₂ :=
-    pair_multiset_eq_of_y_match_and_prod_eq N₁ N₂ γ hN_card hN_y hN_y_nonzero hN_prod
+    pair_multiset_eq_of_y_match_and_prod_eq N₁ N₂ h_prod_biv
   exact triple_multiset_eq_of_pair_eq_of_const_third M₁ M₂ γ
     h₁_const h₂_const (by simp [← hN₁, ← hN₂, hN_eq])
 
@@ -605,6 +587,7 @@ theorem recurrence_boundary_iff_multiset
     [Infinite F]
     (D : PlonkLean.EvaluationDomain F n) (hn : 0 < n) (σ : Sigma n)
     (w : Witness F n) (k1 k2 : F)
+    (h_idValue_inj : Function.Injective (idValue D k1 k2))
     (h_idValue_nonzero : ∀ i : Fin (3 * n), idValue D k1 k2 i ≠ 0) :
     (∀ β γ : F, β ≠ 0 → γ ≠ 0 →
       (∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0) →
@@ -616,68 +599,83 @@ theorem recurrence_boundary_iff_multiset
       idMultiset D w k1 k2 γ = sigmaMultiset D σ w k1 k2 γ) := by
   constructor
   · intro h_rec γ
+    -- Build the polynomial-in-γ identity once: numPolyγ = denomPolyγ in F[X].
+    have h_polyeq : ∀ β : F, β ≠ 0 →
+        numPolyγ D w β k1 k2 = denomPolyγ D σ w β k1 k2 := by
+      intro β hβ
+      apply Polynomial.eq_of_infinite_eval_eq
+      have h_den_finite : Set.Finite
+          { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' } :=
+        Polynomial.finite_setOf_isRoot
+          (denomPolyγ_ne_zero D σ w β k1 k2)
+      have h_bad_finite :
+          ({0} ∪ { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' } :
+            Set F).Finite :=
+        (Set.finite_singleton 0).union h_den_finite
+      have h_compl_infinite :
+          (Set.univ \ ({0} ∪
+            { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' }) :
+              Set F).Infinite :=
+        Set.infinite_univ.diff h_bad_finite
+      refine h_compl_infinite.mono ?_
+      intro γ' hγ'
+      obtain ⟨_, hγ'_bad⟩ := hγ'
+      have hγ'_ne : γ' ≠ 0 := by intro h0; exact hγ'_bad (Or.inl h0)
+      have hγ'_not_root :
+          ¬ (denomPolyγ D σ w β k1 k2).IsRoot γ' := fun hr =>
+        hγ'_bad (Or.inr hr)
+      have hden_each : ∀ i : Fin n, denom D σ w β γ' k1 k2 i ≠ 0 := by
+        intro i hi0
+        apply hγ'_not_root
+        show (denomPolyγ D σ w β k1 k2).eval γ' = 0
+        rw [denomPolyγ_eval]
+        exact Finset.prod_eq_zero (Finset.mem_univ i) hi0
+      have h_rec_at := h_rec β γ' hβ hγ'_ne hden_each
+      have h_rowprod :
+          (∏ j : Fin n, num D w β γ' k1 k2 j) =
+          (∏ j : Fin n, denom D σ w β γ' k1 k2 j) :=
+        (recurrence_iff_row_product_equality D hn σ w β γ' k1 k2 hden_each).mp
+          h_rec_at
+      show (numPolyγ D w β k1 k2).eval γ' = (denomPolyγ D σ w β k1 k2).eval γ'
+      rw [numPolyγ_eval, denomPolyγ_eval]
+      exact h_rowprod
+    -- Same identity at β = 0: num = denom pointwise (β=0 makes idValue/sigmaValue
+    -- factors collapse to identical (witness + γ) factors).
+    have h_polyeq_β0 : numPolyγ D w 0 k1 k2 = denomPolyγ D σ w 0 k1 k2 := by
+      unfold numPolyγ denomPolyγ
+      apply Finset.prod_congr rfl
+      intro j _
+      unfold numRowPolyγ denomRowPolyγ
+      simp [zero_mul, add_zero]
+    -- Bridge: pair-multiset bivariate prod equals numPolyγ.eval γ' (for ids).
+    have bridge_id : ∀ β γ' : F,
+        (((idMultiset D w k1 k2 γ).map (fun t => (t.1, t.2.1))).map
+          (fun p => p.1 + β * p.2 + γ')).prod = (numPolyγ D w β k1 k2).eval γ' := by
+      intro β γ'
+      rw [numPolyγ_eval]
+      rw [prod_num_eq_multiset_prod D w β γ' k1 k2]
+      unfold idMultiset
+      rw [Multiset.map_map, Multiset.map_map, Multiset.map_map]
+      rfl
+    have bridge_sigma : ∀ β γ' : F,
+        (((sigmaMultiset D σ w k1 k2 γ).map (fun t => (t.1, t.2.1))).map
+          (fun p => p.1 + β * p.2 + γ')).prod =
+        (denomPolyγ D σ w β k1 k2).eval γ' := by
+      intro β γ'
+      rw [denomPolyγ_eval]
+      rw [prod_denom_eq_multiset_prod D σ w β γ' k1 k2]
+      unfold sigmaMultiset
+      rw [Multiset.map_map, Multiset.map_map, Multiset.map_map]
+      rfl
     refine multiset_prod_eq_iff_multiset_eq
       (idMultiset D w k1 k2 γ) (sigmaMultiset D σ w k1 k2 γ) γ
-      ?_ (idMultiset_y_eq_sigmaMultiset_y D σ w k1 k2 γ)
-      ?_ (idMultiset_third_const D w k1 k2 γ)
+      (idMultiset_third_const D w k1 k2 γ)
       (sigmaMultiset_third_const D σ w k1 k2 γ) ?_
-    · rw [idMultiset_card, sigmaMultiset_card]
-    · -- h_y_nonzero: y-coords of idMultiset are idValue, nonzero by hypothesis.
-      intro t ht
-      unfold idMultiset at ht
-      obtain ⟨i, _, hi⟩ := Multiset.mem_map.mp ht
-      rw [← hi]
-      exact h_idValue_nonzero i
-    · -- Unified polynomial-extension argument: build polynomials in γ for the
-      -- row-num and row-denom products. They agree on the cofinite set
-      -- {γ' : γ' ≠ 0 ∧ denomPolyγ doesn't vanish at γ'} via h_rec. Cofinite +
-      -- [Infinite F] ⇒ infinite agreement ⇒ equal as polynomials ⇒ equal at γ.
-      intro β hβ
-      rw [← prod_num_eq_multiset_prod D w β γ k1 k2,
-          ← prod_denom_eq_multiset_prod D σ w β γ k1 k2]
-      have h_polyeq : numPolyγ D w β k1 k2 = denomPolyγ D σ w β k1 k2 := by
-        apply Polynomial.eq_of_infinite_eval_eq
-        have h_den_finite : Set.Finite
-            { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' } :=
-          Polynomial.finite_setOf_isRoot
-            (denomPolyγ_ne_zero D σ w β k1 k2)
-        have h_bad_finite :
-            ({0} ∪ { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' } :
-              Set F).Finite :=
-          (Set.finite_singleton 0).union h_den_finite
-        have h_compl_infinite :
-            (Set.univ \ ({0} ∪
-              { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' }) :
-                Set F).Infinite :=
-          Set.infinite_univ.diff h_bad_finite
-        refine h_compl_infinite.mono ?_
-        intro γ' hγ'
-        obtain ⟨_, hγ'_bad⟩ := hγ'
-        have hγ'_ne : γ' ≠ 0 := by
-          intro h0; exact hγ'_bad (Or.inl h0)
-        have hγ'_not_root :
-            ¬ (denomPolyγ D σ w β k1 k2).IsRoot γ' := fun hr =>
-          hγ'_bad (Or.inr hr)
-        have hden_each : ∀ i : Fin n, denom D σ w β γ' k1 k2 i ≠ 0 := by
-          intro i hi0
-          apply hγ'_not_root
-          show (denomPolyγ D σ w β k1 k2).eval γ' = 0
-          rw [denomPolyγ_eval]
-          exact Finset.prod_eq_zero (Finset.mem_univ i) hi0
-        have h_rec_at := h_rec β γ' hβ hγ'_ne hden_each
-        have h_rowprod :
-            (∏ j : Fin n, num D w β γ' k1 k2 j) =
-            (∏ j : Fin n, denom D σ w β γ' k1 k2 j) :=
-          (recurrence_iff_row_product_equality D hn σ w β γ' k1 k2 hden_each).mp
-            h_rec_at
-        show (numPolyγ D w β k1 k2).eval γ' = (denomPolyγ D σ w β k1 k2).eval γ'
-        rw [numPolyγ_eval, denomPolyγ_eval]
-        exact h_rowprod
-      have h_at_γ :
-          (numPolyγ D w β k1 k2).eval γ = (denomPolyγ D σ w β k1 k2).eval γ := by
-        rw [h_polyeq]
-      rw [numPolyγ_eval, denomPolyγ_eval] at h_at_γ
-      exact h_at_γ
+    intro β γ'
+    rw [bridge_id, bridge_sigma]
+    by_cases hβ : β = 0
+    · subst hβ; rw [h_polyeq_β0]
+    · rw [h_polyeq β hβ]
   · intro h_mset β γ _hβ _hγ h_denom i
     have h_prod : (∏ j : Fin n, num D w β γ k1 k2 j) =
         (∏ j : Fin n, denom D σ w β γ k1 k2 j) := by

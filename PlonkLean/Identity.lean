@@ -166,7 +166,7 @@ theorem copyConstraints_implies_permutation_vanishes
       Permutation.sigmaMultiset D σ w k1 k2 γ' := fun γ' =>
     (Permutation.multiset_equality_iff_copyConstraints D σ w k1 k2 γ' h_idValue_inj).mpr h_copy
   have h_rec :=
-    (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2 h_idValue_nonzero).mpr h_mset
+    (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2 h_idValue_inj h_idValue_nonzero).mpr h_mset
       β γ hβ hγ h_denom
   apply Permutation.permMain_vanishes_on_domain D σ w β γ k1 k2 h_denom
   intro i hi_wrap
@@ -250,7 +250,7 @@ theorem permutation_vanishes_iff
       exact hC2
     have h_mset : ∀ γ : F,
         Permutation.idMultiset D w k1 k2 γ = Permutation.sigmaMultiset D σ w k1 k2 γ :=
-      (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2 h_idValue_nonzero).mp h_rec
+      (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2 h_idValue_inj h_idValue_nonzero).mp h_rec
     exact (Permutation.multiset_equality_iff_copyConstraints D σ w k1 k2 0
       h_idValue_inj).mp (h_mset 0)
   · -- Reverse: CopyConstraints implies vanishing for any (β, γ).

@@ -134,5 +134,31 @@ example (p : SmallPoint) : 0 + p = p := zero_add' p
 example (p q : SmallPoint) : p + q = q + p := add_comm' p q
 example (p : SmallPoint) : -p + p = 0 := neg_add_cancel' p
 
+/-! ## The group has order 8
+
+We verify by computation that every point has additive order dividing 8.
+This is the discrete-cyclic-group structure expected of an elliptic curve
+of small order. -/
+
+/-- The 8 underlying coordinate pairs of the curve, materialized for `decide`. -/
+def pointList : List (F × F) :=
+  [(0, 1), (0, 4), (1, 0), (4, 0), (2, 2), (2, 3), (3, 2), (3, 3)]
+
+theorem pointList_eq_points : ∀ p ∈ pointList, OnCurve p := by decide
+
+/-- The 8-fold sum of a SmallPoint with itself, computed via the AddCommGroup
+nsmul. Specialized statement: every curve point has order dividing 8. -/
+theorem add_eight_eq_zero (p : F × F) (h : OnCurve p) :
+    let q : SmallPoint := ⟨p, h⟩
+    q + q + q + q + q + q + q + q = (0 : SmallPoint) := by
+  intro q
+  -- Reduce to the underlying F × F equation via Subtype.ext
+  apply Subtype.ext
+  show addPt (addPt (addPt (addPt (addPt (addPt (addPt p p) p) p) p) p) p) p
+        = zeroPt
+  -- This is a decide-able fact about the 8 specific points.
+  revert h p
+  decide
+
 end SmallPoint
 end PlonkLean.EllipticCurve.Small

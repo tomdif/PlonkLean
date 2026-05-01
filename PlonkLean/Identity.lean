@@ -150,9 +150,11 @@ Proof path: `CopyConstraints → multiset equality (C3) → recurrence (C4 backw
 → poly vanishes (C2)`. The boundary half is `permBoundary_vanishes_on_domain`
 (C1), universal for the canonical Plonk grand product. -/
 theorem copyConstraints_implies_permutation_vanishes
+    [Infinite F]
     (D : EvaluationDomain F n) (hn : 0 < n) (σ : Permutation.Sigma n)
     (w : Arithmetization.Witness F n) (k1 k2 : F)
-    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2)) :
+    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2))
+    (h_idValue_nonzero : ∀ i : Fin (3 * n), Permutation.idValue D k1 k2 i ≠ 0) :
     Permutation.CopyConstraints σ w →
     ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
       (∀ i : Fin n, Permutation.denom D σ w β γ k1 k2 i ≠ 0) →
@@ -164,7 +166,7 @@ theorem copyConstraints_implies_permutation_vanishes
       Permutation.sigmaMultiset D σ w k1 k2 γ' := fun γ' =>
     (Permutation.multiset_equality_iff_copyConstraints D σ w k1 k2 γ' h_idValue_inj).mpr h_copy
   have h_rec :=
-    (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2).mpr h_mset
+    (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2 h_idValue_nonzero).mpr h_mset
       β γ hβ hγ h_denom
   apply Permutation.permMain_vanishes_on_domain D σ w β γ k1 k2 h_denom
   intro i hi_wrap
@@ -209,9 +211,11 @@ a row recurrence at each `(β, γ)`, then C4 forward
 
 Reverse proof: direct application of `copyConstraints_implies_permutation_vanishes`. -/
 theorem permutation_vanishes_iff
+    [Infinite F]
     (D : EvaluationDomain F n) (hn : 0 < n) (σ : Permutation.Sigma n)
     (w : Arithmetization.Witness F n) (k1 k2 : F)
-    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2)) :
+    (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2))
+    (h_idValue_nonzero : ∀ i : Fin (3 * n), Permutation.idValue D k1 k2 i ≠ 0) :
     (∀ β γ : F, β ≠ 0 → γ ≠ 0 →
       (∀ i : Fin n, Permutation.denom D σ w β γ k1 k2 i ≠ 0) →
       ((∀ i : Fin n, (permutationMainPoly D σ w β γ k1 k2).eval (D.element i) = 0) ∧
@@ -246,11 +250,12 @@ theorem permutation_vanishes_iff
       exact hC2
     have h_mset : ∀ γ : F,
         Permutation.idMultiset D w k1 k2 γ = Permutation.sigmaMultiset D σ w k1 k2 γ :=
-      (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2).mp h_rec
+      (Permutation.recurrence_boundary_iff_multiset D hn σ w k1 k2 h_idValue_nonzero).mp h_rec
     exact (Permutation.multiset_equality_iff_copyConstraints D σ w k1 k2 0
       h_idValue_inj).mp (h_mset 0)
   · -- Reverse: CopyConstraints implies vanishing for any (β, γ).
     exact copyConstraints_implies_permutation_vanishes D hn σ w k1 k2 h_idValue_inj
+      h_idValue_nonzero
       h_copy β γ hβ hγ h_denom
 
 /-- **Sub-lemma D (α-separation, ∀α version).** A polynomial of the form
@@ -314,10 +319,12 @@ to extract the `(β, γ)`-independent gate-vanishing fact from the universal
 statement we need at least one valid `(β, γ)`. Cryptographic Plonk meets this
 condition trivially via Fiat-Shamir from a field of cryptographic size. -/
 theorem plonk_satisfaction_iff_quotient
+    [Infinite F]
     (D : EvaluationDomain F n) (hn : 0 < n) (h2 : (2 : F) ≠ 0)
     (Cs : Arithmetization.Circuit F n) (w : Arithmetization.Witness F n)
     (k1 k2 : F)
     (h_idValue_inj : Function.Injective (Permutation.idValue D k1 k2))
+    (h_idValue_nonzero : ∀ i : Fin (3 * n), Permutation.idValue D k1 k2 i ≠ 0)
     (h_no_lookup : Cs.lookup = none)
     (h_exists_random : ∃ β₀ γ₀ : F, β₀ ≠ 0 ∧ γ₀ ≠ 0 ∧
       ∀ i : Fin n, Permutation.denom D Cs.sigma w β₀ γ₀ k1 k2 i ≠ 0) :
@@ -339,7 +346,7 @@ theorem plonk_satisfaction_iff_quotient
     rintro ⟨h_gate, h_copy⟩ β γ hβ hγ h_denom α
     have h_gid : ∀ i, (gateIdentityPoly D Cs.selectors w).eval (D.element i) = 0 :=
       (gateIdentity_vanishes_iff D Cs.selectors w).mpr h_gate
-    have h_perm := (permutation_vanishes_iff D hn Cs.sigma w k1 k2 h_idValue_inj).mpr
+    have h_perm := (permutation_vanishes_iff D hn Cs.sigma w k1 k2 h_idValue_inj h_idValue_nonzero).mpr
       h_copy β γ hβ hγ h_denom
     have h_master_van : ∀ i, (masterIdentity D Cs w β γ k1 k2 α).eval (D.element i) = 0 := by
       intro i
@@ -381,7 +388,7 @@ theorem plonk_satisfaction_iff_quotient
       have hs := h_split β γ hβ hγ h_denom
       exact ⟨hs.2.1, hs.2.2⟩
     have h_copy : Permutation.CopyConstraints Cs.sigma w :=
-      (permutation_vanishes_iff D hn Cs.sigma w k1 k2 h_idValue_inj).mp h_perm_all
+      (permutation_vanishes_iff D hn Cs.sigma w k1 k2 h_idValue_inj h_idValue_nonzero).mp h_perm_all
     exact ⟨h_gate, h_copy⟩
 
 end PlonkLean

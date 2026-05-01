@@ -402,23 +402,120 @@ lemma idMultiset_y_eq_sigmaMultiset_y
             intro i _
             rfl
 
+/-! ## Polynomial-in-γ extension (for closing γ=0 / denom=0 in headline) -/
+
+section PolynomialGammaExtension
+
+open Polynomial
+
+/-- The row-`j` numerator viewed as a polynomial in γ (X plays role of γ). -/
+noncomputable def numRowPolyγ
+    (D : PlonkLean.EvaluationDomain F n) (w : Witness F n)
+    (β k1 k2 : F) (j : Fin n) : F[X] :=
+  (C (w.a j + β * idValue D k1 k2 (flatLeft j))  + X) *
+  (C (w.b j + β * idValue D k1 k2 (flatRight j)) + X) *
+  (C (w.c j + β * idValue D k1 k2 (flatOut j))   + X)
+
+/-- The row-`j` denominator viewed as a polynomial in γ. -/
+noncomputable def denomRowPolyγ
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β k1 k2 : F) (j : Fin n) : F[X] :=
+  (C (w.a j + β * sigmaValue D σ k1 k2 (flatLeft j))  + X) *
+  (C (w.b j + β * sigmaValue D σ k1 k2 (flatRight j)) + X) *
+  (C (w.c j + β * sigmaValue D σ k1 k2 (flatOut j))   + X)
+
+private lemma numRowPolyγ_eval
+    (D : PlonkLean.EvaluationDomain F n) (w : Witness F n)
+    (β γ k1 k2 : F) (j : Fin n) :
+    (numRowPolyγ D w β k1 k2 j).eval γ = num D w β γ k1 k2 j := by
+  unfold numRowPolyγ num
+  simp [eval_mul, eval_add, eval_C, eval_X]
+
+private lemma denomRowPolyγ_eval
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F) (j : Fin n) :
+    (denomRowPolyγ D σ w β k1 k2 j).eval γ = denom D σ w β γ k1 k2 j := by
+  unfold denomRowPolyγ denom
+  simp [eval_mul, eval_add, eval_C, eval_X]
+
+/-- The universe product of row numerator polynomials (in γ). -/
+noncomputable def numPolyγ
+    (D : PlonkLean.EvaluationDomain F n) (w : Witness F n)
+    (β k1 k2 : F) : F[X] :=
+  ∏ j : Fin n, numRowPolyγ D w β k1 k2 j
+
+/-- The universe product of row denominator polynomials (in γ). -/
+noncomputable def denomPolyγ
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β k1 k2 : F) : F[X] :=
+  ∏ j : Fin n, denomRowPolyγ D σ w β k1 k2 j
+
+private lemma numPolyγ_eval
+    (D : PlonkLean.EvaluationDomain F n) (w : Witness F n)
+    (β γ k1 k2 : F) :
+    (numPolyγ D w β k1 k2).eval γ = ∏ j : Fin n, num D w β γ k1 k2 j := by
+  unfold numPolyγ
+  rw [eval_prod]
+  exact Finset.prod_congr rfl (fun j _ => numRowPolyγ_eval D w β γ k1 k2 j)
+
+private lemma denomPolyγ_eval
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β γ k1 k2 : F) :
+    (denomPolyγ D σ w β k1 k2).eval γ = ∏ j : Fin n, denom D σ w β γ k1 k2 j := by
+  unfold denomPolyγ
+  rw [eval_prod]
+  exact Finset.prod_congr rfl (fun j _ => denomRowPolyγ_eval D σ w β γ k1 k2 j)
+
+/-- A polynomial of the form `C a + X` is non-zero in `F[X]`. -/
+private lemma C_add_X_ne_zero (a : F) : (C a + X : F[X]) ≠ 0 := by
+  intro h
+  have hd : (C a + X : F[X]).natDegree = 1 := by
+    rw [add_comm]; exact natDegree_X_add_C a
+  rw [h, natDegree_zero] at hd
+  exact one_ne_zero hd.symm
+
+private lemma denomRowPolyγ_ne_zero
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β k1 k2 : F) (j : Fin n) : denomRowPolyγ D σ w β k1 k2 j ≠ 0 := by
+  unfold denomRowPolyγ
+  exact mul_ne_zero (mul_ne_zero (C_add_X_ne_zero _) (C_add_X_ne_zero _))
+    (C_add_X_ne_zero _)
+
+/-- The universe-product denominator polynomial in γ is non-zero. -/
+private lemma denomPolyγ_ne_zero
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (β k1 k2 : F) : denomPolyγ D σ w β k1 k2 ≠ 0 := by
+  unfold denomPolyγ
+  exact Finset.prod_ne_zero_iff.mpr
+    (fun j _ => denomRowPolyγ_ne_zero D σ w β k1 k2 j)
+
+end PolynomialGammaExtension
+
 /-! ## Sub-claim 4: multiset products equal for all β ⇒ multisets equal -/
 
 /-- **Sub-claim 4a (deep polynomial-identity core, OPEN).**
 
-Given two multisets of `F × F` pairs with matching y-multisets, if the
-products `∏ (xᵢ + β·yᵢ + γ)` agree as functions of `β` (for all `β ≠ 0`),
-then the pair-multisets themselves agree.
+Given two multisets of `F × F` pairs with matching y-multisets and all
+y-values nonzero, if the products `∏ (xᵢ + β·yᵢ + γ)` agree as functions
+of `β` (for all `β ≠ 0`), then the pair-multisets themselves agree.
 
-This isolates the Schwartz-Zippel content of sub-claim 4. A complete
-proof requires either `[Infinite F]` (using `Polynomial.eq_of_infinite_eval_eq`)
-or `[Fintype F]` with `Fintype.card F > N + 1` (using
-`Polynomial.eq_of_natDegree_lt_card_of_eval_eq`). For Plonk over BN254 /
-BLS12-381 scalar fields, both apply trivially. -/
+Requires `[Infinite F]` (used via `Polynomial.eq_of_infinite_eval_eq`).
+For Plonk over BN254 / BLS12-381 finite scalar fields, an `[Fintype F]`
+with cardinality bound variant would be needed; we use the cleaner
+infinite-field formulation here, with the understanding that downstream
+uses can substitute (cryptographic Plonk fields are well above the
+required cardinality threshold).
+
+The `h_y_nonzero` hypothesis allows factoring `φ p = C(p.2)·(X − C(ρ p))`
+where `ρ p := -(p.1 + γ)/p.2` (the linear form's root); this is essential
+for the polynomial-roots argument. In Plonk, `idValue` outputs lie in
+`H ∪ k₁H ∪ k₂H ⊂ F^*` so the y-nonzero condition holds when `k₁, k₂ ≠ 0`. -/
 theorem pair_multiset_eq_of_y_match_and_prod_eq
+    [Infinite F]
     (N₁ N₂ : Multiset (F × F)) (γ : F)
     (h_card : N₁.card = N₂.card)
     (h_y_match : N₁.map Prod.snd = N₂.map Prod.snd)
+    (h_y_nonzero : ∀ p ∈ N₁, p.2 ≠ 0)
     (h_prod : ∀ β : F, β ≠ 0 →
       (N₁.map fun p => p.1 + β * p.2 + γ).prod =
       (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
@@ -453,9 +550,11 @@ private lemma triple_multiset_eq_of_pair_eq_of_const_third
 Composes `pair_multiset_eq_of_y_match_and_prod_eq` (deep) with
 `triple_multiset_eq_of_pair_eq_of_const_third` (bookkeeping). -/
 theorem multiset_prod_eq_iff_multiset_eq
+    [Infinite F]
     (M₁ M₂ : Multiset (F × F × F)) (γ : F)
     (h_card : M₁.card = M₂.card)
     (h_y_match : M₁.map (fun t => t.2.1) = M₂.map (fun t => t.2.1))
+    (h_y_nonzero : ∀ t ∈ M₁, t.2.1 ≠ 0)
     (h₁_const : ∀ t ∈ M₁, t.2.2 = γ)
     (h₂_const : ∀ t ∈ M₂, t.2.2 = γ)
     (h_prod : ∀ β : F, β ≠ 0 →
@@ -468,6 +567,12 @@ theorem multiset_prod_eq_iff_multiset_eq
   have hN_y : N₁.map Prod.snd = N₂.map Prod.snd := by
     simp only [hN₁, hN₂, Multiset.map_map]
     exact h_y_match
+  have hN_y_nonzero : ∀ p ∈ N₁, p.2 ≠ 0 := by
+    intro p hp
+    simp only [hN₁, Multiset.mem_map] at hp
+    obtain ⟨t, ht, ht_eq⟩ := hp
+    rw [← ht_eq]
+    exact h_y_nonzero t ht
   have hN_prod : ∀ β : F, β ≠ 0 →
       (N₁.map fun p => p.1 + β * p.2 + γ).prod =
       (N₂.map fun p => p.1 + β * p.2 + γ).prod := by
@@ -489,7 +594,7 @@ theorem multiset_prod_eq_iff_multiset_eq
     rw [← e₁, ← e₂]
     exact h_prod β hβ
   have hN_eq : N₁ = N₂ :=
-    pair_multiset_eq_of_y_match_and_prod_eq N₁ N₂ γ hN_card hN_y hN_prod
+    pair_multiset_eq_of_y_match_and_prod_eq N₁ N₂ γ hN_card hN_y hN_y_nonzero hN_prod
   exact triple_multiset_eq_of_pair_eq_of_const_third M₁ M₂ γ
     h₁_const h₂_const (by simp [← hN₁, ← hN₂, hN_eq])
 
@@ -497,8 +602,10 @@ theorem multiset_prod_eq_iff_multiset_eq
 
 /-- **Sub-sub-lemma C4 (recurrence + boundary ↔ multiset equality).** -/
 theorem recurrence_boundary_iff_multiset
+    [Infinite F]
     (D : PlonkLean.EvaluationDomain F n) (hn : 0 < n) (σ : Sigma n)
-    (w : Witness F n) (k1 k2 : F) :
+    (w : Witness F n) (k1 k2 : F)
+    (h_idValue_nonzero : ∀ i : Fin (3 * n), idValue D k1 k2 i ≠ 0) :
     (∀ β γ : F, β ≠ 0 → γ ≠ 0 →
       (∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0) →
       (∀ i : Fin n,
@@ -512,23 +619,65 @@ theorem recurrence_boundary_iff_multiset
     refine multiset_prod_eq_iff_multiset_eq
       (idMultiset D w k1 k2 γ) (sigmaMultiset D σ w k1 k2 γ) γ
       ?_ (idMultiset_y_eq_sigmaMultiset_y D σ w k1 k2 γ)
-      (idMultiset_third_const D w k1 k2 γ)
+      ?_ (idMultiset_third_const D w k1 k2 γ)
       (sigmaMultiset_third_const D σ w k1 k2 γ) ?_
     · rw [idMultiset_card, sigmaMultiset_card]
-    · intro β hβ
+    · -- h_y_nonzero: y-coords of idMultiset are idValue, nonzero by hypothesis.
+      intro t ht
+      unfold idMultiset at ht
+      obtain ⟨i, _, hi⟩ := Multiset.mem_map.mp ht
+      rw [← hi]
+      exact h_idValue_nonzero i
+    · -- Unified polynomial-extension argument: build polynomials in γ for the
+      -- row-num and row-denom products. They agree on the cofinite set
+      -- {γ' : γ' ≠ 0 ∧ denomPolyγ doesn't vanish at γ'} via h_rec. Cofinite +
+      -- [Infinite F] ⇒ infinite agreement ⇒ equal as polynomials ⇒ equal at γ.
+      intro β hβ
       rw [← prod_num_eq_multiset_prod D w β γ k1 k2,
           ← prod_denom_eq_multiset_prod D σ w β γ k1 k2]
-      by_cases hγ : γ = 0
-      · -- γ = 0 case: h_rec requires γ ≠ 0; needs polynomial-continuity in γ
-        -- to extend from cofinite γ ≠ 0 to γ = 0.
-        sorry
-      · by_cases hdenom : ∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0
-        · exact (recurrence_iff_row_product_equality D hn σ w β γ k1 k2 hdenom).mp
-            (h_rec β γ hβ hγ hdenom)
-        · -- γ ≠ 0 but some denom_i (β, γ) = 0: finite set of bad β
-          -- (zeros of ∏ denom_i (·, γ)). Closing via Schwartz-Zippel /
-          -- polynomial identity in β.
-          sorry
+      have h_polyeq : numPolyγ D w β k1 k2 = denomPolyγ D σ w β k1 k2 := by
+        apply Polynomial.eq_of_infinite_eval_eq
+        have h_den_finite : Set.Finite
+            { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' } :=
+          Polynomial.finite_setOf_isRoot
+            (denomPolyγ_ne_zero D σ w β k1 k2)
+        have h_bad_finite :
+            ({0} ∪ { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' } :
+              Set F).Finite :=
+          (Set.finite_singleton 0).union h_den_finite
+        have h_compl_infinite :
+            (Set.univ \ ({0} ∪
+              { γ' : F | (denomPolyγ D σ w β k1 k2).IsRoot γ' }) :
+                Set F).Infinite :=
+          Set.infinite_univ.diff h_bad_finite
+        refine h_compl_infinite.mono ?_
+        intro γ' hγ'
+        obtain ⟨_, hγ'_bad⟩ := hγ'
+        have hγ'_ne : γ' ≠ 0 := by
+          intro h0; exact hγ'_bad (Or.inl h0)
+        have hγ'_not_root :
+            ¬ (denomPolyγ D σ w β k1 k2).IsRoot γ' := fun hr =>
+          hγ'_bad (Or.inr hr)
+        have hden_each : ∀ i : Fin n, denom D σ w β γ' k1 k2 i ≠ 0 := by
+          intro i hi0
+          apply hγ'_not_root
+          show (denomPolyγ D σ w β k1 k2).eval γ' = 0
+          rw [denomPolyγ_eval]
+          exact Finset.prod_eq_zero (Finset.mem_univ i) hi0
+        have h_rec_at := h_rec β γ' hβ hγ'_ne hden_each
+        have h_rowprod :
+            (∏ j : Fin n, num D w β γ' k1 k2 j) =
+            (∏ j : Fin n, denom D σ w β γ' k1 k2 j) :=
+          (recurrence_iff_row_product_equality D hn σ w β γ' k1 k2 hden_each).mp
+            h_rec_at
+        show (numPolyγ D w β k1 k2).eval γ' = (denomPolyγ D σ w β k1 k2).eval γ'
+        rw [numPolyγ_eval, denomPolyγ_eval]
+        exact h_rowprod
+      have h_at_γ :
+          (numPolyγ D w β k1 k2).eval γ = (denomPolyγ D σ w β k1 k2).eval γ := by
+        rw [h_polyeq]
+      rw [numPolyγ_eval, denomPolyγ_eval] at h_at_γ
+      exact h_at_γ
   · intro h_mset β γ _hβ _hγ h_denom i
     have h_prod : (∏ j : Fin n, num D w β γ k1 k2 j) =
         (∏ j : Fin n, denom D σ w β γ k1 k2 j) := by

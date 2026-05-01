@@ -12,3 +12,4 @@ import PlonkLean.Permutation.MultisetEquality
 import PlonkLean.Permutation.RecurrenceMultiset
 import PlonkLean.Lookup.Plookup
 import PlonkLean.Identity
+import PlonkLean.KZG.Foundations

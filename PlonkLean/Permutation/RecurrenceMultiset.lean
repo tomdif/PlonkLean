@@ -368,19 +368,130 @@ theorem prod_denom_eq_multiset_prod
   rw [← Finset.prod_mul_distrib, ← Finset.prod_mul_distrib]
   exact Finset.prod_congr rfl (fun _ _ => rfl)
 
+/-! ## Bonus: y-projections of `idMultiset` and `sigmaMultiset` agree -/
+
+/-- The y-projections of `idMultiset` and `sigmaMultiset` are equal as multisets,
+because `sigmaValue = idValue ∘ σ` and σ permutes the universe of `Fin (3n)`. -/
+lemma idMultiset_y_eq_sigmaMultiset_y
+    (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
+    (k1 k2 γ : F) :
+    (idMultiset D w k1 k2 γ).map (fun t => t.2.1) =
+    (sigmaMultiset D σ w k1 k2 γ).map (fun t => t.2.1) := by
+  unfold idMultiset sigmaMultiset
+  rw [Multiset.map_map, Multiset.map_map]
+  show (Finset.univ : Finset (Fin (3 * n))).val.map
+        (fun i => idValue D k1 k2 i) =
+      (Finset.univ : Finset (Fin (3 * n))).val.map
+        (fun i => sigmaValue D σ k1 k2 i)
+  have h_univ : ((Finset.univ : Finset (Fin (3 * n))).val.map
+        (σ : Fin (3 * n) → Fin (3 * n))) =
+      (Finset.univ : Finset (Fin (3 * n))).val :=
+    Multiset.map_univ_val_equiv (σ : Equiv.Perm (Fin (3 * n)))
+  calc (Finset.univ : Finset (Fin (3 * n))).val.map
+          (fun i => idValue D k1 k2 i)
+      = ((Finset.univ : Finset (Fin (3 * n))).val.map
+          (σ : Fin (3 * n) → Fin (3 * n))).map
+          (fun j => idValue D k1 k2 j) := by
+            rw [h_univ]
+    _ = (Finset.univ : Finset (Fin (3 * n))).val.map
+          (fun i => idValue D k1 k2 (σ i)) := by
+            rw [Multiset.map_map]; rfl
+    _ = (Finset.univ : Finset (Fin (3 * n))).val.map
+          (fun i => sigmaValue D σ k1 k2 i) := by
+            apply Multiset.map_congr rfl
+            intro i _
+            rfl
+
 /-! ## Sub-claim 4: multiset products equal for all β ⇒ multisets equal -/
 
-/-- **Sub-claim 4 (Schwartz-Zippel core) — STILL OPEN.** -/
+/-- **Sub-claim 4a (deep polynomial-identity core, OPEN).**
+
+Given two multisets of `F × F` pairs with matching y-multisets, if the
+products `∏ (xᵢ + β·yᵢ + γ)` agree as functions of `β` (for all `β ≠ 0`),
+then the pair-multisets themselves agree.
+
+This isolates the Schwartz-Zippel content of sub-claim 4. A complete
+proof requires either `[Infinite F]` (using `Polynomial.eq_of_infinite_eval_eq`)
+or `[Fintype F]` with `Fintype.card F > N + 1` (using
+`Polynomial.eq_of_natDegree_lt_card_of_eval_eq`). For Plonk over BN254 /
+BLS12-381 scalar fields, both apply trivially. -/
+theorem pair_multiset_eq_of_y_match_and_prod_eq
+    (N₁ N₂ : Multiset (F × F)) (γ : F)
+    (h_card : N₁.card = N₂.card)
+    (h_y_match : N₁.map Prod.snd = N₂.map Prod.snd)
+    (h_prod : ∀ β : F, β ≠ 0 →
+      (N₁.map fun p => p.1 + β * p.2 + γ).prod =
+      (N₂.map fun p => p.1 + β * p.2 + γ).prod) :
+    N₁ = N₂ := by
+  sorry
+
+/-- Triple-multiset equality from pair-multiset equality, given a constant
+third coordinate on both sides. Pure bookkeeping. -/
+private lemma triple_multiset_eq_of_pair_eq_of_const_third
+    (M₁ M₂ : Multiset (F × F × F)) (γ : F)
+    (h₁_const : ∀ t ∈ M₁, t.2.2 = γ)
+    (h₂_const : ∀ t ∈ M₂, t.2.2 = γ)
+    (h_pair : M₁.map (fun t => (t.1, t.2.1)) =
+              M₂.map (fun t => (t.1, t.2.1))) :
+    M₁ = M₂ := by
+  have key : ∀ M : Multiset (F × F × F),
+      (∀ t ∈ M, t.2.2 = γ) →
+      M = (M.map (fun t => (t.1, t.2.1))).map (fun p => (p.1, p.2, γ)) := by
+    intro M hM
+    rw [Multiset.map_map]
+    conv_lhs => rw [← Multiset.map_id M]
+    refine Multiset.map_congr rfl ?_
+    intro t ht
+    have h3 := hM t ht
+    obtain ⟨a, b, c⟩ := t
+    simp at h3
+    simp [h3]
+  rw [key M₁ h₁_const, key M₂ h₂_const, h_pair]
+
+/-- **Sub-claim 4 (Schwartz-Zippel core, restructured with y-match).**
+
+Composes `pair_multiset_eq_of_y_match_and_prod_eq` (deep) with
+`triple_multiset_eq_of_pair_eq_of_const_third` (bookkeeping). -/
 theorem multiset_prod_eq_iff_multiset_eq
     (M₁ M₂ : Multiset (F × F × F)) (γ : F)
     (h_card : M₁.card = M₂.card)
+    (h_y_match : M₁.map (fun t => t.2.1) = M₂.map (fun t => t.2.1))
     (h₁_const : ∀ t ∈ M₁, t.2.2 = γ)
     (h₂_const : ∀ t ∈ M₂, t.2.2 = γ)
     (h_prod : ∀ β : F, β ≠ 0 →
       (M₁.map fun t => t.1 + β * t.2.1 + t.2.2).prod =
       (M₂.map fun t => t.1 + β * t.2.1 + t.2.2).prod) :
     M₁ = M₂ := by
-  sorry
+  set N₁ : Multiset (F × F) := M₁.map (fun t => (t.1, t.2.1)) with hN₁
+  set N₂ : Multiset (F × F) := M₂.map (fun t => (t.1, t.2.1)) with hN₂
+  have hN_card : N₁.card = N₂.card := by simp [hN₁, hN₂, h_card]
+  have hN_y : N₁.map Prod.snd = N₂.map Prod.snd := by
+    simp only [hN₁, hN₂, Multiset.map_map]
+    exact h_y_match
+  have hN_prod : ∀ β : F, β ≠ 0 →
+      (N₁.map fun p => p.1 + β * p.2 + γ).prod =
+      (N₂.map fun p => p.1 + β * p.2 + γ).prod := by
+    intro β hβ
+    have e₁ : (M₁.map fun t => t.1 + β * t.2.1 + t.2.2) =
+              N₁.map fun p => p.1 + β * p.2 + γ := by
+      simp only [hN₁, Multiset.map_map]
+      refine Multiset.map_congr rfl ?_
+      intro t ht
+      have h3 := h₁_const t ht
+      simp [h3]
+    have e₂ : (M₂.map fun t => t.1 + β * t.2.1 + t.2.2) =
+              N₂.map fun p => p.1 + β * p.2 + γ := by
+      simp only [hN₂, Multiset.map_map]
+      refine Multiset.map_congr rfl ?_
+      intro t ht
+      have h3 := h₂_const t ht
+      simp [h3]
+    rw [← e₁, ← e₂]
+    exact h_prod β hβ
+  have hN_eq : N₁ = N₂ :=
+    pair_multiset_eq_of_y_match_and_prod_eq N₁ N₂ γ hN_card hN_y hN_prod
+  exact triple_multiset_eq_of_pair_eq_of_const_third M₁ M₂ γ
+    h₁_const h₂_const (by simp [← hN₁, ← hN₂, hN_eq])
 
 /-! ## Headline theorem -/
 
@@ -400,10 +511,24 @@ theorem recurrence_boundary_iff_multiset
   · intro h_rec γ
     refine multiset_prod_eq_iff_multiset_eq
       (idMultiset D w k1 k2 γ) (sigmaMultiset D σ w k1 k2 γ) γ
-      ?_ (idMultiset_third_const D w k1 k2 γ)
+      ?_ (idMultiset_y_eq_sigmaMultiset_y D σ w k1 k2 γ)
+      (idMultiset_third_const D w k1 k2 γ)
       (sigmaMultiset_third_const D σ w k1 k2 γ) ?_
     · rw [idMultiset_card, sigmaMultiset_card]
-    · sorry
+    · intro β hβ
+      rw [← prod_num_eq_multiset_prod D w β γ k1 k2,
+          ← prod_denom_eq_multiset_prod D σ w β γ k1 k2]
+      by_cases hγ : γ = 0
+      · -- γ = 0 case: h_rec requires γ ≠ 0; needs polynomial-continuity in γ
+        -- to extend from cofinite γ ≠ 0 to γ = 0.
+        sorry
+      · by_cases hdenom : ∀ i : Fin n, denom D σ w β γ k1 k2 i ≠ 0
+        · exact (recurrence_iff_row_product_equality D hn σ w β γ k1 k2 hdenom).mp
+            (h_rec β γ hβ hγ hdenom)
+        · -- γ ≠ 0 but some denom_i (β, γ) = 0: finite set of bad β
+          -- (zeros of ∏ denom_i (·, γ)). Closing via Schwartz-Zippel /
+          -- polynomial identity in β.
+          sorry
   · intro h_mset β γ _hβ _hγ h_denom i
     have h_prod : (∏ j : Fin n, num D w β γ k1 k2 j) =
         (∏ j : Fin n, denom D σ w β γ k1 k2 j) := by

@@ -17,14 +17,16 @@ constant-coordinate facts:
    product over `idMultiset`'s entries of the linear form
    `t.1 + β·t.2.1 + t.2.2`.
 3. `prod_denom_eq_multiset_prod` — σ-side analogue for `sigmaMultiset`.
-4. `multiset_prod_eq_iff_multiset_eq` — the Schwartz-Zippel core: equal
-   linear-form products for all `β ≠ 0` (with the third coordinate fixed
-   to `γ` and matching cardinalities) implies multiset equality.
+4. `multiset_prod_eq_iff_multiset_eq` — the Schwartz-Zippel core.
 
-Auxiliary closeable facts:
-* `idMultiset_card`, `sigmaMultiset_card` — both have cardinality `3·n`.
-* `idMultiset_third_const`, `sigmaMultiset_third_const` — every triple's
-  third coordinate equals `γ`.
+**Structural note on sub-claim 4:** as currently stated (single γ fixed,
+product equality at all β ≠ 0), the conclusion does NOT follow. The
+single-variable polynomial in β determines the multiset of *roots* and the
+leading coefficient, but NOT the multiset of pairs `(xᵢ, yᵢ)`. Two fixes:
+(a) `[Fintype F]` with `Fintype.card F > M₁.card + 1` plus γ-variation
+    (the headline already has `∀ γ`, so this is natural); or
+(b) Add `M₁.map (·.2.1) = M₂.map (·.2.1)` (matching y-multisets), which
+    holds in Plonk because `sigmaValue = idValue ∘ σ` and σ is a permutation.
 -/
 
 namespace PlonkLean.Permutation
@@ -35,22 +37,19 @@ variable {F : Type*} [Field F] {n : ℕ}
 
 /-! ## Auxiliary facts: cardinality and third-coordinate constancy -/
 
-/-- The identity-side multiset has exactly `3 · n` entries. -/
 lemma idMultiset_card
     (D : PlonkLean.EvaluationDomain F n) (w : Witness F n) (k1 k2 γ : F) :
     (idMultiset D w k1 k2 γ).card = 3 * n := by
   unfold idMultiset
-  simp [Multiset.card_map, Finset.card_univ, Fintype.card_fin]
+  simp
 
-/-- The σ-side multiset also has exactly `3 · n` entries. -/
 lemma sigmaMultiset_card
     (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
     (k1 k2 γ : F) :
     (sigmaMultiset D σ w k1 k2 γ).card = 3 * n := by
   unfold sigmaMultiset
-  simp [Multiset.card_map, Finset.card_univ, Fintype.card_fin]
+  simp
 
-/-- Every triple in `idMultiset` has third coordinate equal to `γ`. -/
 lemma idMultiset_third_const
     (D : PlonkLean.EvaluationDomain F n) (w : Witness F n) (k1 k2 γ : F) :
     ∀ t ∈ idMultiset D w k1 k2 γ, t.2.2 = γ := by
@@ -59,7 +58,6 @@ lemma idMultiset_third_const
   rcases Multiset.mem_map.mp ht with ⟨i, _, hi⟩
   simp [← hi]
 
-/-- Every triple in `sigmaMultiset` has third coordinate equal to `γ`. -/
 lemma sigmaMultiset_third_const
     (D : PlonkLean.EvaluationDomain F n) (σ : Sigma n) (w : Witness F n)
     (k1 k2 γ : F) :
@@ -72,7 +70,15 @@ lemma sigmaMultiset_third_const
 /-! ## Sub-claim 1: recurrence ↔ row-product equality (telescoping) -/
 
 /-- **Sub-claim 1.** Per-row recurrence (with wraparound) plus non-zero
-denominators is equivalent to `∏ num = ∏ denom`. Telescoping argument. -/
+denominators is equivalent to `∏ num = ∏ denom`. Telescoping argument.
+
+PROOF NOT CLOSED. Outline:
+- Forward: take h_rec at i = ⟨n-1, _⟩. Get `Z_⟨0,_⟩ · denom_{n-1} =
+  Z_{n-1} · num_{n-1}`. Since `Z_⟨0,_⟩ = 1` (`grandProductValues_zero`),
+  `denom_{n-1} = Z_{n-1} · num_{n-1}`. Multiply by `∏_{j<n-1} denom_j`
+  and use telescoping (`Z_{n-1} · ∏ denom = ∏ num`) to get
+  `∏_{j<n} denom = ∏_{j<n} num`.
+- Backward: case-split on i. -/
 theorem recurrence_iff_row_product_equality
     (D : PlonkLean.EvaluationDomain F n) (hn : 0 < n) (σ : Sigma n)
     (w : Witness F n) (β γ k1 k2 : F)
@@ -106,9 +112,13 @@ theorem prod_denom_eq_multiset_prod
 
 /-! ## Sub-claim 4: multiset products equal for all β ⇒ multisets equal -/
 
-/-- **Sub-claim 4 (Schwartz-Zippel core).** Equal cardinality, constant
-third coordinate, equal linear-form products at all `β ≠ 0` ⇒ multisets
-equal. Deepest sub-claim; left as `sorry`. -/
+/-- **Sub-claim 4 (Schwartz-Zippel core).**
+
+**STRUCTURAL ISSUE — NOT CLOSED.** The single-variable polynomial
+`P_M(β) = ∏(β·yᵢ + xᵢ + γ)` determines the multiset of *roots* `-(xᵢ+γ)/yᵢ`
+and the leading coefficient `∏ yᵢ`, but NOT the multiset of pairs `(xᵢ, yᵢ)`.
+Closing requires either γ-variation (`[Fintype F]` with cardinality bound)
+or matching-y-multiset hypothesis. -/
 theorem multiset_prod_eq_iff_multiset_eq
     (M₁ M₂ : Multiset (F × F × F)) (γ : F)
     (h_card : M₁.card = M₂.card)
@@ -135,19 +145,14 @@ theorem recurrence_boundary_iff_multiset
     (∀ γ : F,
       idMultiset D w k1 k2 γ = sigmaMultiset D σ w k1 k2 γ) := by
   constructor
-  · -- Forward: recurrence ⇒ multiset equality at every γ.
-    intro h_rec γ
+  · intro h_rec γ
     refine multiset_prod_eq_iff_multiset_eq
       (idMultiset D w k1 k2 γ) (sigmaMultiset D σ w k1 k2 γ) γ
       ?_ (idMultiset_third_const D w k1 k2 γ)
       (sigmaMultiset_third_const D σ w k1 k2 γ) ?_
     · rw [idMultiset_card, sigmaMultiset_card]
-    · -- Bridge: from `h_rec` (which assumes `γ ≠ 0` and non-zero denoms)
-      -- to row-product equality at every β ≠ 0. Residual sorry: connecting
-      -- the γ ≠ 0 / nondegenerate-denom hypotheses to all β ≠ 0.
-      sorry
-  · -- Backward: multiset equality ⇒ recurrence.
-    intro h_mset β γ _hβ _hγ h_denom i
+    · sorry
+  · intro h_mset β γ _hβ _hγ h_denom i
     have h_prod : (∏ j : Fin n, num D w β γ k1 k2 j) =
         (∏ j : Fin n, denom D σ w β γ k1 k2 j) := by
       rw [prod_num_eq_multiset_prod D w β γ k1 k2,

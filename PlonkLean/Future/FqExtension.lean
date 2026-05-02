@@ -173,6 +173,7 @@ the fixed field `F_q` (i.e. has zero `c1` component) and equals
 to `F_q`. -/
 def norm (x : Fq2) : Fq := x.c0 * x.c0 + x.c1 * x.c1
 
+omit [BLS12_q_Prime] in
 @[simp] theorem norm_def (x : Fq2) : norm x = x.c0 * x.c0 + x.c1 * x.c1 := rfl
 
 /-- The norm is `c0` of `x · frob x`. -/
@@ -223,10 +224,12 @@ def inv (x : Fq2) : Fq2 :=
 
 instance : Inv Fq2 := ⟨inv⟩
 
+omit [Fq2_NonResidue] in
 theorem inv_zero_def : (0 : Fq2)⁻¹ = 0 := by
   show inv 0 = 0
   simp [inv]
 
+omit [Fq2_NonResidue] in
 theorem inv_def {x : Fq2} (hx : x ≠ 0) :
     x⁻¹ = ⟨x.c0 / norm x, -x.c1 / norm x⟩ := by
   show inv x = _

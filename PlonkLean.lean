@@ -58,3 +58,9 @@ import PlonkLean.EllipticCurve.SmallGroup
 import PlonkLean.EllipticCurve.BLS12Primes
 import PlonkLean.EllipticCurve.BLS12Curve
 import PlonkLean.EllipticCurve.BLS12Connect
+import PlonkLean.Future.BLS12GroupLaw
+import PlonkLean.Future.EdwardsAssocLift
+import PlonkLean.Future.FRIProximityBounds
+import PlonkLean.Future.Halo2ImplRefinement
+import PlonkLean.Future.KZGBlindingZK
+import PlonkLean.Future.InCircuitGates

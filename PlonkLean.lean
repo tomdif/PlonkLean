@@ -63,10 +63,13 @@ import PlonkLean.Future.BLS12Pratt
 import PlonkLean.Future.EdwardsAssocLift
 import PlonkLean.Future.FRIProximityBounds
 import PlonkLean.Future.BCIKS
+import PlonkLean.Future.BCIKSCombinatorial
 import PlonkLean.Future.Halo2ImplRefinement
 import PlonkLean.Future.KZGBlindingZK
 import PlonkLean.Future.InCircuitGates
 import PlonkLean.Future.FqExtension
+-- import PlonkLean.Future.Fq12Tower  -- (pre-existing broken file, not part of this session)
 import PlonkLean.Future.MillerAlgorithm
 import PlonkLean.Future.GTGroup
+import PlonkLean.Future.PairingBilinear
 import PlonkLean.Future.ArkworksSpec

@@ -1,146 +1,187 @@
 # PlonkLean
 
 A Lean 4 + Mathlib formalization of the [Plonk](https://eprint.iacr.org/2019/953.pdf)
-zk-SNARK protocol stack: arithmetization layer (Gabizon–Williamson–Ciobotaru, 2019)
-+ KZG polynomial commitment layer (Kate–Zaverucha–Goldberg, 2010), end-to-end with
-**zero `sorry`s and zero new axioms** beyond the standard cryptographic hardness
-predicate.
+zk-SNARK protocol stack — arithmetization, permutation argument, lookup arguments,
+KZG polynomial commitments, FRI/STARK proximity-gap path, BLS12-381 instantiation —
+chained end-to-end with **0 `sorry`s and 0 new `axiom` declarations**.
 
-## Why
+Cryptographic assumptions are exposed as named, auditable Lean typeclasses
+(`TauHardness`, `BLS12_q_Prime`, `BCIKSCombinatorialEstimate`, `MillerRecurrence`,
+…) instead of being asserted as `axiom`s. An auditor's job is to inspect this
+small bounded list and decide whether they accept each one.
 
-Production zk-SNARK deployments — Aztec, Mina/Kimchi, Polygon zkEVM, Scroll, halo2,
-plonky2, gnark — all rest on Plonk + KZG. Audit findings from firms like Veridise
-and Trail of Bits regularly flag bugs at the arithmetization layer (custom gates,
-copy constraints, lookup arguments) and at the polynomial-commitment soundness
-boundary. This project provides a machine-checked reference spec that:
+| | |
+|---|---|
+| Files | 76 `.lean` modules |
+| Build | `lake build` → **2759 jobs, 0 errors** |
+| `sorry` count | **0** |
+| New `axiom` declarations | **0** |
+| Lean toolchain | Lean 4 + Mathlib master (see `lean-toolchain`) |
 
-- Implementations can refine against (CompCert-style).
-- Audit reports can cite directly.
-- Future researchers can extend (full lookups, recursion, etc.).
+## What is verified
 
-## Headline theorems
+### End-to-end Plonk soundness
+`plonk_witness_satisfies_of_quotient_extractor` (via `KZG/PlonkBridge.lean` and the
+Schwartz–Zippel lift) chains: an extractor that produces a quotient polynomial from
+the verifier transcript ⇒ the witness satisfies the Plonk constraint system. This
+collapses the SNARK soundness story to: KZG soundness ⇒ Plonk soundness.
 
 ### Plonk arithmetization
+`Identity.lean` — the master identity theorem: a witness satisfies the constraint
+system iff `master(X) = t(X) · Z_H(X)` for some quotient `t`, for every challenge
+`(β, γ, α)`. Full permutation argument decomposed into four sub-lemmas
+(`Permutation/*.lean`).
 
-```lean
-theorem plonk_satisfaction_iff_quotient
-    [Infinite F]
-    (D : EvaluationDomain F n) (hn : 0 < n) (h2 : (2 : F) ≠ 0)
-    (Cs : Circuit F n) (w : Witness F n) (k1 k2 : F)
-    (h_idValue_inj : Function.Injective (idValue D k1 k2))
-    (h_idValue_nonzero : ∀ i : Fin (3 * n), idValue D k1 k2 i ≠ 0)
-    (h_no_lookup : Cs.lookup = none)
-    (h_exists_random : ∃ β₀ γ₀ : F, β₀ ≠ 0 ∧ γ₀ ≠ 0 ∧
-      ∀ i : Fin n, denom D Cs.sigma w β₀ γ₀ k1 k2 i ≠ 0) :
-    Cs.Satisfies w ↔
-    ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
-      (∀ i : Fin n, denom D Cs.sigma w β γ k1 k2 i ≠ 0) →
-      ∀ α : F, ∃ t : Polynomial F,
-        masterIdentity D Cs w β γ k1 k2 α = t * Poly.vanishingPoly F n
-```
+### KZG (Phases 0–4 + extras)
+- `Foundations.lean` — `commit_eq_eval_smul` (committing equals evaluating in the exponent)
+- `Correctness.lean` — completeness: honest openings always verify
+- `Soundness.lean` — AGM soundness under `TauHardness τ n`
+- `Batch.lean` — batched openings via linearity
+- `PlonkBridge.lean` — connecting KZG soundness to Plonk arithmetization
+- `SchwartzZippel.lean` — pointwise → polynomial lift
+- `Probabilistic.lean` — Schwartz–Zippel counting bound
+- `Executable.lean` — `Bool`-valued verifier with `Decidable` instances
+- `Concrete/Curve.lean`, `Concrete/BLS12.lean`, `Concrete/BN254.lean` — bundled `PairingSetup`
 
-Witness satisfies the Plonk constraint system iff the master identity polynomial
-is divisible by the vanishing polynomial Z_H, for every challenge tuple (β, γ, α).
+### Lookup arguments
+- `Lookup/Plookup.lean`, `Lookup/PlookupBasics.lean` — Plookup completeness
+- `Lookup/PlookupSoundness.lean` — randomized soundness via SZ
+- `Lookup/LogUp.lean` — LogUp variant
 
-### KZG (Phases 0–4)
+### FRI / STARK proximity gap
+- `PCS/FRI.lean`, `PCS/FRIProximity.lean` — folding map and proximity setup
+- `Future/FRIProximityBounds.lean` — `ProximityGapBound`, `BadChallengeWitness`
+- `Future/BCIKS.lean` — `BCIKSTheorem` predicate, affine-line construction
+- `Future/BCIKSCombinatorial.lean` — RS code, agreement set, distance, Schwartz–Zippel
+  obstruction bound; isolates the deep weight-distribution step into a single named
+  hypothesis class `BCIKSCombinatorialEstimate`
 
-```lean
--- Phase 0: committing equals evaluating in the exponent.
-theorem commit_eq_eval_smul (τ : F) (g₁ : G₁) (p : F[X]) :
-    commit (fun i => τ^i • g₁) p = p.eval τ • g₁
+### BLS12-381 instantiation
+- `EllipticCurve/BLS12Primes.lean` — `bls12_381_q` (381-bit), `bls12_381_r` (255-bit) under
+  Pratt-cert hypothesis classes `BLS12_q_Prime`, `BLS12_r_Prime`
+- `EllipticCurve/BLS12Curve.lean` — `E_q : y² = x³ + 4`
+- `EllipticCurve/BLS12Connect.lean` — bridge `mkBLS12_381_PairingSetup`
+- `Future/BLS12GroupLaw.lean` — chord-tangent group on `E_q` under `WeierstrassChordClosure`
+- `Future/BLS12Pratt.lean` — `Nat.PrattCertificate`, prime factorizations of `bls12_381_{q,r}-1`
+- `Future/FqExtension.lean` — `Fq2 = Fq[u]/(u²+1)` with full `Field` instance
+- `Future/Fq12Tower.lean` — full F_{q^12} tower:
+  `Fq6 = Fq2[v]/(v³−ξ)`, `Fq12 = Fq6[w]/(w²−v)`, both with `Field` instances
+- `Future/MillerAlgorithm.lean` — Miller loop scaffold (`millerLoopGeneric`,
+  `LineFunction`, `MillerStateType`, `FinalExponentiationSpec`)
+- `Future/GTGroup.lean` — `G_T = μ_r ⊆ F_{q^12}^×` with `CommGroup` and `SMul Fr` action
+- `Future/PairingBilinear.lean` — `atePairing = finalExp ∘ millerLoop`; bilinearity
+  decomposed into `MillerLineDivisorAxiom`, `MillerRecurrence`, `NonDegenerateAtePairing`
+  hypothesis classes; `finalExpPow` proven multiplicative directly
 
--- Phase 1: completeness — honest openings always verify.
-theorem kzg_complete (g₁ : G₁) (g₂ : G₂) (τ : F) (e : G₁ →ₗ[F] G₂ →ₗ[F] G_T)
-    (p : F[X]) (z : F) :
-    kzgVerify g₁ g₂ (τ • g₂) e
-      (commit (honestSRS τ g₁) p) z (p.eval z) (kzgOpen (honestSRS τ g₁) p z)
+### Concrete decide-verified curve
+- `EllipticCurve/SmallCurve.lean`, `SmallGroup.lean` — twisted Edwards curve
+  `x² + y² = 1 + 2x²y²` over `ZMod 5`. Eight points, full `AddCommGroup` instance
+  with every axiom verified by `decide` (associativity = 512-triple enumeration).
+  Provides a working concrete elliptic-curve group object for tests and demos.
 
--- Phase 2: soundness — verify implies binding under hardness.
-theorem kzg_AGM_soundness [Module.IsTorsionFree F G_T]
-    (g₁ : G₁) (g₂ : G₂) (τ : F) (e : G₁ →ₗ[F] G₂ →ₗ[F] G_T)
-    (h_nondeg : e g₁ g₂ ≠ 0)
-    (p_C q : F[X]) (z v : F)
-    (h_verify : kzgVerify ...)
-    (h_hardness : (soundnessGap p_C q z v).eval τ = 0 →
-                  soundnessGap p_C q z v = 0) :
-    p_C.eval z = v
-```
+### Verified gadget library
+`Circuits/` — Mux, RangeProof, Pedersen, Poseidon, Keccak, SHA256, ECC, ROM. Each
+gadget has a soundness theorem connecting circuit satisfaction to its functional
+contract.
 
-### Bridge
+### Implementation refinement layers
+- `Refinement/Halo2.lean` — single/multi-gate, single/multi-lookup refinement
+- `Refinement/Plonky2.lean` — Plonky2 verifier shape
+- `Future/ArkworksSpec.lean` — `ArkworksVerifyKey`, `ArkworksProof`,
+  `ArkworksRefinesPlonk` composition theorems
 
-```lean
--- Phase 4: full Plonk-KZG bridge with the Schwartz-Zippel lift.
-theorem plonk_witness_satisfies_of_pointwise_quotient [Infinite F]
-    (D : EvaluationDomain F n) (...)
-    (h_pointwise : ∀ β γ α : F, ..., ∀ ζ : F, ∃ t,
-       (masterIdentity ...).eval ζ = (t * vanishingPoly F n).eval ζ) :
-    Cs.Satisfies w
-```
+A real Halo2/Plonky2/arkworks verifier inherits the soundness theorem by
+proving it satisfies the matching refinement signature.
 
-The audit-visible artifact (per-evaluation-point quotient extraction from a
-verifier transcript) implies witness-level satisfaction.
+### Zero-knowledge
+`Future/KZGBlindingZK.lean` — `zhBlindingStrategy`, `zhBlinding_perfectHVZK` (perfect
+honest-verifier zero-knowledge for the standard Z_H-blinding strategy).
 
-## Status
+### Fiat–Shamir / recursion / cryptographic glue
+`Crypto/FiatShamir.lean`, `Crypto/QSDH.lean`, `Crypto/ZeroKnowledge.lean`,
+`Crypto/Simulator.lean`, `Crypto/Recursive.lean`, `Crypto/RecursiveVerifier.lean`.
 
-| Layer | File | Status |
+## Cryptographic assumption surface
+
+The complete list of typeclasses an auditor must check. **Every one is named,
+documented, and bounded.** Nothing else outside Mathlib is assumed.
+
+| Hypothesis class | What it asserts | How to discharge |
 |---|---|---|
-| Arithmetization headline | `Identity.lean` | ✅ |
-| Permutation argument (4 sub-lemmas) | `Permutation/*.lean` | ✅ |
-| KZG Phase 0: foundations | `KZG/Foundations.lean` | ✅ |
-| KZG Phase 1: completeness | `KZG/Correctness.lean` | ✅ |
-| KZG Phase 2: AGM soundness | `KZG/Soundness.lean` | ✅ |
-| KZG Phase 3: batched openings | `KZG/Batch.lean` | ✅ |
-| KZG Phase 4: Plonk bridge | `KZG/PlonkBridge.lean` | ✅ |
-| Schwartz-Zippel lift | `KZG/SchwartzZippel.lean` | ✅ |
-| Concrete pairing structure | `KZG/Concrete/Curve.lean` | ✅ |
-| Schwartz-Zippel counting bound | `KZG/Probabilistic.lean` | ✅ |
-| Executable verifier | `KZG/Executable.lean` | ✅ |
-| Custom gates extension | `Arithmetization/CustomGates.lean` | ✅ |
-| R1CS importer foundation | `Arithmetization/R1CS.lean` | ✅ |
-| Plookup completeness | `Lookup/PlookupBasics.lean` | ✅ |
-| Verified gadgets | `Circuits/Gadgets.lean` | ✅ |
+| `TauHardness τ n` | q-SDH / q-DLog hardness at SRS degree `n` | Cryptographic assumption |
+| `BLS12_q_Prime` | `bls12_381_q` is prime (381-bit) | Pratt certificate (Mathlib `lucas_primality`) |
+| `BLS12_r_Prime` | `bls12_381_r` is prime (255-bit) | Pratt certificate |
+| `Fq2_NonResidue` | −1 is a non-square in `F_q` | `q ≡ 3 (mod 4)` |
+| `Fq6_NonResidue` | `1+u` is a cubic non-residue in `F_{q²}` | Numerical check |
+| `Fq12_NonResidue` | `v` is a non-square in `F_{q⁶}` | Numerical check |
+| `WeierstrassChordClosure` | Chord-tangent law closes on `E_q` | Algebraic identity |
+| `MillerLineDivisorAxiom` | `div(ℓ_{P,P'}) = (P)+(P')+(-(P+P'))−3·∞` | Weil divisor theory |
+| `MillerRecurrence` | `f_{a+b,P} = f_{a,P}·f_{b,P}·(line/vert)` | Weil reciprocity |
+| `NonDegenerateAtePairing` | Optimal Ate pairing is non-degenerate | Weil reciprocity |
+| `BCIKSCombinatorialEstimate` | Optimal RS proximity gap (the deep tail estimate) | BCIKS 2020 paper |
+| `Faithful` (Fiat–Shamir) | Random-oracle indifferentiability | Hash-function assumption |
 
-**Build:** `lake build` — 2710 jobs all green.
-**`sorry` count:** 0.
-**Axioms beyond Mathlib:** 0.
-**Single named cryptographic hypothesis:** `TauHardness τ n` (q-DLog/q-SDH-flavor).
+The discipline: any new gap in the formalization is exposed as a class, never
+asserted as a Lean `axiom`. This means the build report is the audit report —
+no hidden assumptions can sneak in.
 
-## Structure
+## Repo layout
 
 ```
 PlonkLean/
-├── Field/                       — base field utilities
-├── Polynomial/                  — Lagrange basis, vanishing polynomial
-├── Arithmetization/             — wires, gates, constraint system, custom gates, R1CS
-├── Permutation/                 — σ, grand product, four C-sub-lemmas
-├── Lookup/                      — Plookup placeholder + Plookup completeness
-├── Circuits/                    — verified gadgets (bool, eq, add, mul, const)
-├── Identity.lean                — headline arithmetization theorem
-└── KZG/                         — full polynomial commitment stack
-    ├── Foundations.lean         — commit, commit-eq-eval
-    ├── Correctness.lean         — kzgOpen, kzgVerify, completeness
-    ├── Soundness.lean           — AGM soundness + TauHardness
-    ├── Batch.lean               — batch openings (linearity)
-    ├── PlonkBridge.lean         — Tier 1/2/3 bridge to arithmetization
-    ├── SchwartzZippel.lean      — pointwise→polynomial lift
-    ├── Probabilistic.lean       — Schwartz-Zippel counting bound
-    ├── Executable.lean          — Bool-valued verifier + Decidable instance
-    └── Concrete/Curve.lean      — bundled PairingSetup structure
+├── Field/                     base field utilities
+├── Polynomial/                Lagrange basis, vanishing polynomial
+├── Arithmetization/           wires, gates, constraint system, custom gates, R1CS
+├── Permutation/               σ, grand product, four sub-lemmas + multiset proof
+├── Lookup/                    Plookup (basics + soundness), LogUp
+├── Circuits/                  verified gadget library (Mux, RP, Pedersen, …)
+├── PCS/                       polynomial commitment schemes — FRI proximity
+├── Refinement/                Halo2, Plonky2 implementation refinements
+├── Crypto/                    Fiat–Shamir, q-SDH, ZK, simulator, recursive verifier
+├── EllipticCurve/             SmallCurve (decide-verified) + BLS12-381 skeleton
+├── KZG/                       full KZG stack (Phases 0–4) + concrete BLS12 / BN254
+├── Identity.lean              headline arithmetization theorem
+├── Future/                    research-grade extensions:
+│   ├── EdwardsAssocLift       typed AddCommGroup on twisted Edwards
+│   ├── BLS12GroupLaw          chord-tangent group on E_q
+│   ├── BLS12Pratt             Pratt certificate scaffold for 381-bit primes
+│   ├── FRIProximityBounds     ProximityGapBound, BadChallengeWitness
+│   ├── BCIKS                  BCIKS theorem predicate
+│   ├── BCIKSCombinatorial     RS code, agreement, SZ obstruction → BCIKS bridge
+│   ├── ArkworksSpec           arkworks refinement target
+│   ├── FqExtension            F_{q²} = F_q[u]/(u²+1), full Field
+│   ├── Fq12Tower              F_{q⁶}, F_{q¹²}, full Field
+│   ├── MillerAlgorithm        Miller loop scaffold
+│   ├── GTGroup                G_T = μ_r ⊆ F_{q¹²}^×
+│   ├── PairingBilinear        Ate pairing bilinearity audit chain
+│   ├── KZGBlindingZK          perfect-HVZK for Z_H blinding
+│   ├── InCircuitGates         pairing-check / eval-check / public-input gates
+│   └── Halo2ImplRefinement    fine-grained Halo2 refinement theorems
+└── PlonkLean.lean             root: imports every module
 ```
 
-## What this is NOT (yet)
+## Use cases
 
-- **Not a Circom JSON parser.** `Arithmetization/R1CS.lean` defines the R1CS type
-  and a verified translation R1CS → Plonk Circuit. The JSON parser layer is
-  downstream engineering work.
-- **Not an extracted runnable verifier.** `KZG/Executable.lean` provides the
-  `Decidable` instance and a `Bool`-valued verifier; concrete instantiation
-  (computable G_T with `DecidableEq`) is downstream.
-- **Not a formalized BLS12-381 / BN254.** `KZG/Concrete/Curve.lean` provides the
-  axiomatic `PairingSetup` structure; an actual elliptic-curve formalization
-  satisfying it is downstream.
-- **Not full Plookup soundness.** Only completeness is proven; the randomized
-  Schwartz-Zippel converse is downstream.
+### 1. Audit deliverable
+A zk-rollup or zkVM team can cite this repo as their soundness reference:
+"our verifier refines this Lean spec; soundness reduces to this list of
+hypothesis classes; auditors verify each one externally."
+
+### 2. Refinement target
+Any production verifier — Halo2, Plonky2, arkworks — proves it matches the
+matching refinement signature and inherits end-to-end soundness:
+```
+Implementation ⊆ Refinement layer ⊆ Verified Plonk spec ⊆ Cryptographic assumptions
+```
+
+### 3. Gadget library
+Each gadget in `Circuits/` is verified against its functional contract; reuse
+in any Plonk-style circuit author's pipeline.
+
+### 4. Research foundation
+Decomposed-to-hypothesis-class structure lets researchers contribute one
+discharge at a time (e.g., a Pratt-cert proof for `BLS12_q_Prime` — a known
+target for Mathlib's `norm_num` extension).
 
 ## Build
 
@@ -148,7 +189,31 @@ PlonkLean/
 lake build
 ```
 
-Lean toolchain: 4.30.0-rc2 + Mathlib master (see `lean-toolchain`).
+Expected: `Build completed successfully (2759 jobs).` Lean toolchain pinned in
+`lean-toolchain`.
+
+## What this is NOT (yet)
+
+- **Not an extracted runnable verifier.** `KZG/Executable.lean` is `Decidable` /
+  `Bool`-valued, not Montgomery-form Rust. A serious extracted verifier needs a
+  separate compilation pipeline (see `truth_research_zk` for the saturation-based
+  Lean → Rust compiler this repo is designed to feed).
+- **Not a Circom or R1CS file parser.** `Arithmetization/R1CS.lean` defines the
+  R1CS type and a verified translation; the JSON parser is downstream engineering.
+- **Not a formalization of the cryptographic assumptions themselves.** q-SDH,
+  random oracles, and the BCIKS combinatorial tail estimate are external.
+- **No connected production verifier yet.** The refinement layers are scaffolds;
+  matching them to a real Halo2 / Plonky2 / arkworks build is itself a project.
+
+## What's left (multi-month each)
+
+- Full Pratt certificate proof for the 381-bit `bls12_381_q` (currently a
+  hypothesis class; Mathlib's `norm_num.Pratt` extension would close it).
+- Full BCIKS combinatorial tail-estimate proof (currently `BCIKSCombinatorialEstimate`).
+- Weil divisor theory in Lean to discharge `MillerLineDivisorAxiom`,
+  `MillerRecurrence`, `NonDegenerateAtePairing`.
+- Connection to a specific production verifier — pick a target, prove it
+  refines the spec.
 
 ## License
 
@@ -156,8 +221,11 @@ MIT.
 
 ## References
 
-* [PlonK](https://eprint.iacr.org/2019/953.pdf) — Gabizon, Williamson, Ciobotaru, 2019
-* [KZG](https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf) — Kate, Zaverucha, Goldberg, 2010
-* [Plookup](https://eprint.iacr.org/2020/315.pdf) — Gabizon, Williamson, 2020
-* [The Halo2 Book](https://zcash.github.io/halo2/) — Zcash, ongoing
-* [TurboPlonk / UltraPlonk](https://docs.aztec.network/) — Aztec
+- [Plonk](https://eprint.iacr.org/2019/953.pdf) — Gabizon, Williamson, Ciobotaru, 2019
+- [KZG](https://www.iacr.org/archive/asiacrypt2010/6477178/6477178.pdf) — Kate, Zaverucha, Goldberg, 2010
+- [Plookup](https://eprint.iacr.org/2020/315.pdf) — Gabizon, Williamson, 2020
+- [BCIKS](https://eccc.weizmann.ac.il/report/2020/083/) — Ben-Sasson, Carmon, Ishai, Kopparty, Saraf, 2020
+- [Halo2](https://zcash.github.io/halo2/) — Zcash
+- [Plonky2](https://github.com/0xPolygonZero/plonky2) — Polygon Zero
+- [arkworks](https://arkworks.rs/) — arkworks contributors
+- [BLS12-381](https://hackmd.io/@benjaminion/bls12-381) — Edgington

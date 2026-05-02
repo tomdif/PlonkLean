@@ -167,12 +167,14 @@ noncomputable def finalExpPow (e : ℕ) : FinalExponentiationSpec Fq12 :=
 theorem finalExpPow_mul (e : ℕ) (x y : Fq12) :
     (finalExpPow e).exp (x * y) =
       (finalExpPow e).exp x * (finalExpPow e).exp y := by
-  simp [finalExpPow_exp, mul_pow]
+  show (x * y) ^ e = x ^ e * y ^ e
+  exact mul_pow x y e
 
 /-- **Final exponentiation sends `1` to `1`.** -/
 theorem finalExpPow_one (e : ℕ) :
     (finalExpPow e).exp (1 : Fq12) = 1 := by
-  simp [finalExpPow_exp]
+  show (1 : Fq12) ^ e = 1
+  exact one_pow e
 
 /-! ## Hypothesis class: final exponentiation is a monoid hom
 

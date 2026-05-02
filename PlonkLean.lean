@@ -68,7 +68,7 @@ import PlonkLean.Future.Halo2ImplRefinement
 import PlonkLean.Future.KZGBlindingZK
 import PlonkLean.Future.InCircuitGates
 import PlonkLean.Future.FqExtension
--- import PlonkLean.Future.Fq12Tower  -- (pre-existing broken file, not part of this session)
+import PlonkLean.Future.Fq12Tower
 import PlonkLean.Future.MillerAlgorithm
 import PlonkLean.Future.GTGroup
 import PlonkLean.Future.PairingBilinear

@@ -1,46 +1,45 @@
 import PlonkLean.EllipticCurve.BLS12Primes
+import PlonkLean.Future.Fq12Tower
 import Mathlib.Algebra.Group.Subgroup.Defs
 import Mathlib.Algebra.Algebra.Defs
 import Mathlib.Data.ZMod.Basic
 
-/-! # The pairing target group `G_T = μ_r ⊆ F_{q^12}^×` (Future Work — SCAFFOLD)
+/-! # The pairing target group `G_T = μ_r ⊆ F_{q^12}^×`
 
 For BLS12-381 the bilinear pairing
 `e : G₁ × G₂ → G_T`
 lands in `G_T = μ_r ⊆ F_{q^12}^×`, the group of `r`-th roots of unity in
 the degree-12 extension of the base field `F_q`.
 
-A *concrete* construction of `F_{q^12}` requires a tower of three quadratic
-/ cubic extensions:
+A *concrete* construction of `F_{q^12}` is built in
+`PlonkLean.Future.Fq12Tower` as the three-step tower
 
 * `F_{q²}  = F_q[u]/(u² + 1)`            (since `q ≡ 3 mod 4`)
 * `F_{q⁶}  = F_{q²}[v]/(v³ − (1 + u))`   (cubic over `F_{q²}`)
 * `F_{q¹²} = F_{q⁶}[w]/(w² − v)`         (quadratic over `F_{q⁶}`)
 
-Formalizing the tower from scratch — proving each defining polynomial
-irreducible, transferring `Field` and `Algebra` instances through each
-quotient, and computing the resulting Frobenius / norm structure — is a
-multi-month formalization effort. We **scope down** to the structural
-skeleton:
+`Fq12Tower.lean` provides the carrier type, a `CommRing` instance, a
+`Field` instance (under the standard cryptographic non-residue
+hypothesis classes `Fq2_NonResidue`, `Fq6_NonResidue`, `Fq12_NonResidue`),
+and an `Algebra Fq Fq12` instance.
 
-1. `BLS12_Fq12` — a hypothesis class declaring an *abstract* `Fq12` type
-   with a `Field` instance and an `Algebra Fq Fq12` structure. (The user
-   discharges this class by exhibiting any concrete construction; the
-   downstream theory does not see the construction details.)
+This file builds the **target group** of the pairing on top of the
+concrete tower:
 
-2. `G_T` — the subtype `{ x : Fq12 // x^r = 1 }` of `r`-th roots of unity.
+1. `Fq12` — re-exported as the concrete tower carrier
+   `PlonkLean.EllipticCurve.BLS12.Fq12`.
 
-3. `CommGroup G_T` — group structure: `1`, `*`, `⁻¹` all preserve the
-   `x^r = 1` predicate, by the homomorphism property of `(·)^r` in a
-   commutative monoid. We construct it by transfer from the unit subgroup
-   `{ x : Fq12ˣ // (x : Fq12)^r = 1 }`.
+2. `BLS12_Fq12` — a *bundled instance* class deriving the `Field` and
+   `Algebra Fq Fq12` instances from the tower. It serves as a single
+   `[BLS12_Fq12]` argument that downstream files use to demand the full
+   tower interface.
 
-4. `Fr`-action on `G_T` — via `n • x = x^(n.val)`, exactly the action under
-   which a *generator* of `G_T` makes `G_T ≃ Fr` as `Fr`-modules.
+3. `G_T` — the subtype `{ x : Fq12 // x^r = 1 }` of `r`-th roots of unity.
 
-This file is **passed-as-hypothesis** for the cryptographic content (the
-existence of `Fq12` and its degree-12 algebra structure). All theorems
-inside `G_T` are proved unconditionally from those hypotheses.
+4. `CommGroup G_T` — group structure: `1`, `*`, `⁻¹` all preserve the
+   `x^r = 1` predicate.
+
+5. `Fr`-action on `G_T` — via `n • x = x^(n.val)`.
 
 NO `sorry`s; NO axioms. -/
 
@@ -48,34 +47,50 @@ namespace PlonkLean.Future
 
 open PlonkLean.EllipticCurve.BLS12
 
-/-! ## The abstract `F_{q^12}` extension
+/-! ## `F_{q^12}` from the concrete tower
 
-We package the existence of a degree-12 extension of `Fq` carrying a
-`Field` instance + `Algebra Fq _` structure as a hypothesis class, exactly
-as `BLS12_q_Prime` packages primality of `q`. -/
+We re-export the concrete construction `PlonkLean.EllipticCurve.BLS12.Fq12`
+under the same short name `Fq12` used throughout this file and downstream. -/
 
-/-- **Hypothesis class.** An abstract realization of `F_{q^12}`: a type
-together with a `Field` instance and an `Algebra Fq _` structure.
+/-- The carrier type of `F_{q^12}`, taken from the concrete BLS12-381
+extension tower built in `Fq12Tower.lean`. -/
+abbrev Fq12 : Type := PlonkLean.EllipticCurve.BLS12.Fq12
 
-A user discharges this class by exhibiting *any* concrete construction (the
-classical tower, an iterated `AdjoinRoot`, etc.). All downstream uses of
-`G_T` see only the algebraic interface, not the construction. -/
-class BLS12_Fq12 [BLS12_q_Prime] where
-  /-- The carrier of `F_{q^12}`. -/
-  carrier : Type
-  /-- `F_{q^12}` is a field. -/
-  field : Field carrier
-  /-- `F_{q^12}` is an `F_q`-algebra. -/
-  algebra : Algebra Fq carrier
+/-- **Bundle instance.** `BLS12_Fq12` packages the three non-residue
+hypotheses required to make the concrete tower a field. Downstream files
+that need `Field Fq12` and `Algebra Fq Fq12` ask for this single instance.
 
-/-- The carrier type of `F_{q^12}`. We keep the name `Fq12` for brevity. -/
-abbrev Fq12 [BLS12_q_Prime] [BLS12_Fq12] : Type := BLS12_Fq12.carrier
+This used to be a `class` declaring an abstract `Fq12` type; now it is
+realized by the concrete tower under the standard BLS12-381 non-residue
+assumptions, mirroring the pattern of `BLS12_q_Prime`. -/
+class BLS12_Fq12 [BLS12_q_Prime] : Prop where
+  /-- The Fq2 non-residue assumption: `−1` is not a square in `F_q`. -/
+  fq2_nonresidue : Fq2.Fq2_NonResidue
+  /-- The Fq6 non-residue assumption: `ξ = 1 + u` is not a cube in `F_{q²}`. -/
+  fq6_nonresidue : Fq6.Fq6_NonResidue
+  /-- The Fq12 non-residue assumption: `v` is not a square in `F_{q⁶}`. -/
+  fq12_nonresidue : Fq12.Fq12_NonResidue
 
+/-- Surface the bundled `Fq2_NonResidue` from `BLS12_Fq12`. -/
+instance bls12_Fq12_to_Fq2 [BLS12_q_Prime] [BLS12_Fq12] : Fq2.Fq2_NonResidue :=
+  BLS12_Fq12.fq2_nonresidue
+
+/-- Surface the bundled `Fq6_NonResidue` from `BLS12_Fq12`. -/
+instance bls12_Fq12_to_Fq6 [BLS12_q_Prime] [BLS12_Fq12] : Fq6.Fq6_NonResidue :=
+  BLS12_Fq12.fq6_nonresidue
+
+/-- Surface the bundled `Fq12_NonResidue` from `BLS12_Fq12`. -/
+instance bls12_Fq12_to_Fq12 [BLS12_q_Prime] [BLS12_Fq12] :
+    Fq12.Fq12_NonResidue :=
+  BLS12_Fq12.fq12_nonresidue
+
+/-- `Fq12` is a field, given the bundled tower assumption. -/
 instance fq12_field [BLS12_q_Prime] [BLS12_Fq12] : Field Fq12 :=
-  BLS12_Fq12.field
+  inferInstance
 
+/-- `Fq12` is an `Fq`-algebra, given the bundled tower assumption. -/
 instance fq12_algebra [BLS12_q_Prime] [BLS12_Fq12] : Algebra Fq Fq12 :=
-  BLS12_Fq12.algebra
+  Fq12.algebra
 
 /-! ## The pairing target group `G_T = μ_r`
 
@@ -170,15 +185,16 @@ instance : Pow G_T ℤ :=
 /-- `G_T` is a commutative group. The proof transfers each axiom from the
 ambient field `Fq12` via `Subtype.ext`. -/
 instance : CommGroup G_T where
-  mul_assoc x y z := by ext; exact mul_assoc _ _ _
-  one_mul x := by ext; exact one_mul _
-  mul_one x := by ext; exact mul_one _
-  mul_comm x y := by ext; exact mul_comm _ _
-  inv_mul_cancel x := by
-    ext
-    show x.1⁻¹ * x.1 = 1
-    have hx : x.1 ≠ 0 := ne_zero_of_isRoot x.2
-    exact inv_mul_cancel₀ hx
+  mul_assoc x y z :=
+    Subtype.ext (by show x.1 * y.1 * z.1 = x.1 * (y.1 * z.1); ring)
+  one_mul x := Subtype.ext (by show (1 : Fq12) * x.1 = x.1; ring)
+  mul_one x := Subtype.ext (by show x.1 * (1 : Fq12) = x.1; ring)
+  mul_comm x y := Subtype.ext (by show x.1 * y.1 = y.1 * x.1; ring)
+  inv_mul_cancel x :=
+    Subtype.ext (by
+      show x.1⁻¹ * x.1 = 1
+      have hx : x.1 ≠ 0 := ne_zero_of_isRoot x.2
+      exact inv_mul_cancel₀ hx)
 
 /-! ### `F_r`-action on `G_T`
 
@@ -203,20 +219,20 @@ instance : SMul Fr G_T where
 
 /-- Bridging fact: scalar multiplication by `0 : Fr` lands at `1 : G_T`.
 This is the base case for the (deferred) `Module Fr G_T` instance. -/
-theorem zero_smul_eq_one (x : G_T) : (0 : Fr) • x = 1 := by
-  ext
-  show x.1 ^ ((0 : Fr).val) = 1
-  rw [ZMod.val_zero, pow_zero]
+theorem zero_smul_eq_one (x : G_T) : (0 : Fr) • x = 1 :=
+  Subtype.ext (by
+    show x.1 ^ ((0 : Fr).val) = 1
+    rw [ZMod.val_zero, pow_zero])
 
 /-- Bridging fact: scalar multiplication by `1 : Fr` is the identity, when
 `r > 1` (so that `(1 : Fr).val = 1`). The hypothesis is automatic for
 BLS12-381 since `r` is a 255-bit prime, but we keep it explicit. -/
 theorem one_smul_eq_self (x : G_T) (hr : 1 < bls12_381_r) :
-    (1 : Fr) • x = x := by
-  ext
-  show x.1 ^ ((1 : Fr).val) = x.1
-  rw [ZMod.val_one_eq_one_mod, Nat.one_mod_eq_one.mpr (by omega : bls12_381_r ≠ 1),
-      pow_one]
+    (1 : Fr) • x = x :=
+  Subtype.ext (by
+    show x.1 ^ ((1 : Fr).val) = x.1
+    rw [ZMod.val_one_eq_one_mod,
+        Nat.one_mod_eq_one.mpr (by omega : bls12_381_r ≠ 1), pow_one])
 
 end G_T
 

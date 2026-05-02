@@ -55,3 +55,6 @@ import PlonkLean.Crypto.RecursiveVerifier
 import PlonkLean.EllipticCurve.EdwardsGroup
 import PlonkLean.EllipticCurve.SmallCurve
 import PlonkLean.EllipticCurve.SmallGroup
+import PlonkLean.EllipticCurve.BLS12Primes
+import PlonkLean.EllipticCurve.BLS12Curve
+import PlonkLean.EllipticCurve.BLS12Connect

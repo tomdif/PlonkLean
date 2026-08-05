@@ -22,10 +22,9 @@ on a Weierstrass curve over `F_q` from scratch is multi-month work in Lean 4.
 
 Our approach in this file is to **decompose** bilinearity into named building
 blocks and to **prove every algebraic step that does not need divisor theory**
-unconditionally. The deep content stays in clearly-named hypothesis classes
-that downstream auditors discharge from external curve theory:
+unconditionally. The deep conclusions currently stay in clearly-named
+hypothesis classes that downstream developments must discharge:
 
-* `MillerLineDivisorAxiom` — the line-divisor identity.
 * `MillerRecurrence` — the Miller function recurrence
   `f_{a+b, P} = f_{a, P} · f_{b, P} · ℓ_{aP, bP} / v_{(a+b)P}`,
   packaged at the output level of the pre-final-exp pairing.
@@ -49,9 +48,7 @@ What is proved **directly** in this file:
 The audit chain:
 
 ```
-   MillerLineDivisorAxiom (divisor identity, EXTERNAL)
-                +
-       Weil reciprocity (EXTERNAL)
+   line-divisor theory + Weil reciprocity (NOT YET FORMALISED)
                 ↓
         MillerRecurrence              NonDegenerateAtePairing
    (recurrence on f_{n,P})            (Weil-reciprocity application)
@@ -200,7 +197,7 @@ instance instFinalExpHomPow (e : ℕ) : FinalExpHom (finalExpPow e) where
   map_one := finalExpPow_one e
   map_mul := finalExpPow_mul e
 
-/-! ## Hypothesis class: the line-divisor identity
+/-! ## The unformalized divisor layer
 
 The geometric content of bilinearity sits in two divisor-theoretic facts:
 
@@ -210,36 +207,12 @@ The geometric content of bilinearity sits in two divisor-theoretic facts:
 * **Weil reciprocity.** For two non-zero rational functions `f, g` with
   disjoint support, `∏_{R} f(R)^{ord_R g} = ∏_{R} g(R)^{ord_R f}`.
 
-These two facts are the entire reason the Miller iteration produces the
-right rational function. We expose them as a *single* hypothesis class
-`MillerLineDivisorAxiom`: a witness that the line evaluation is compatible
-with the curve group law in the multiplicative sense the Miller iteration
-needs. The class lives at the `LineFunction Fq12` level and is opaque about
-the divisor formalism, so auditors can discharge it from any external
-divisor-theoretic library without exposing the entire formalism here. -/
-
-/-- **Hypothesis class.** Witness that the line function `ℓ` correctly
-encodes the divisor identity
-`div(ℓ_{P, P'}) = (P) + (P') + (-(P+P')) − 3·(∞)`
-in the form needed to drive the Miller-loop recurrence. The carrier is a
-single Boolean predicate: existence of the divisor identity is the only fact
-we ask for, and it gates the more concrete `MillerRecurrence` below. -/
-class MillerLineDivisorAxiom
-    (ℓ : LineFunction Fq12)
-    (addPt : E_q → E_q → E_q) : Prop where
-  /-- The line-divisor witness. Its content is the divisor identity above;
-  here it is just `True`, since the substantive divisor formalism is
-  external and downstream auditors check it independently. -/
-  divisor_witness : True
-
-/-- The canonical / vacuous instance, available everywhere. The substantive
-content is the **paired** axiom `MillerRecurrence` below; this class is a
-labelled placeholder for the divisor identity that drives the recurrence,
-included so the audit chain explicitly names the divisor step. -/
-instance trivial_lineDivisorAxiom
-    (ℓ : LineFunction Fq12) (addPt : E_q → E_q → E_q) :
-    MillerLineDivisorAxiom ℓ addPt where
-  divisor_witness := trivial
+These two facts are the reason the Miller iteration produces the right
+rational function. Earlier versions represented this missing layer by a
+typeclass whose only field was `True`. That marker added no logical content
+and could mislead an assumption audit, so it has been removed. The actual
+formal boundary consumed below is `MillerRecurrence`; a future divisor library
+should prove that class rather than populate a vacuous marker. -/
 
 /-! ## Hypothesis class: the Miller-loop recurrence
 
@@ -447,14 +420,12 @@ named building blocks. The proof is pure typeclass-driven combination. -/
 * `NonDegenerateAtePairing` (non-degeneracy of the post-final-exp pairing),
 * `FinalExpHom` (the final exponentiation is a multiplicative monoid hom).
 
-The first two hypotheses are themselves classically proved from Weil
-reciprocity and the line-divisor identity (encapsulated in
-`MillerLineDivisorAxiom`); the final-exp hom property is proved directly
-in this file for the canonical final-exp spec. -/
+The first two hypotheses are classically proved from Weil reciprocity and the
+line-divisor identity; that derivation is not yet formalized. The final-exp hom
+property is proved directly in this file for the canonical final-exp spec. -/
 instance instAteBilinear_from_recurrence
     (ℓ : LineFunction Fq12) (addPt : E_q → E_q → E_q) (doublePt : E_q → E_q)
     (fe : FinalExponentiationSpec Fq12)
-    [MillerLineDivisorAxiom ℓ addPt]
     [hRec : MillerRecurrence ℓ addPt doublePt]
     [hND : NonDegenerateAtePairing ℓ addPt doublePt fe]
     [hFE : FinalExpHom fe] :
@@ -479,12 +450,10 @@ recurrence inputs. -/
 
 /-- Specialisation of `instAteBilinear_from_recurrence` to the canonical
 `finalExpPow e` final exponentiation. The `FinalExpHom` instance is filled
-in automatically; only the divisor / recurrence / non-degeneracy classes
-need to be supplied. -/
+in automatically; only recurrence and non-degeneracy need to be supplied. -/
 example
     (ℓ : LineFunction Fq12) (addPt : E_q → E_q → E_q) (doublePt : E_q → E_q)
     (e : ℕ)
-    [MillerLineDivisorAxiom ℓ addPt]
     [MillerRecurrence ℓ addPt doublePt]
     [NonDegenerateAtePairing ℓ addPt doublePt (finalExpPow e)] :
     AteBilinear ℓ addPt doublePt (finalExpPow e) :=
@@ -496,9 +465,7 @@ The total dependency graph of this file's bilinearity result, with all
 "classical" steps explicitly named as hypothesis classes:
 
 ```
-   MillerLineDivisorAxiom         ← divisor of line is (P)+(P')+(-(P+P'))−3·∞
-            +
-       Weil reciprocity            ← classical curve theorem (EXTERNAL)
+   line divisors + Weil reciprocity ← NOT YET FORMALISED
             ↓ (combined classically)
     MillerRecurrence (this file)   ← (·)^e form for arbitrary e
             ↓
@@ -515,8 +482,7 @@ The total dependency graph of this file's bilinearity result, with all
     AteBilinear ⇒ atePairingGeneric is a bilinear pairing (proved here)
 ```
 
-Hypothesis classes — auditors discharge from external curve theory:
-* `MillerLineDivisorAxiom`
+Hypothesis classes — downstream developments must discharge:
 * `MillerRecurrence`
 * `NonDegenerateAtePairing`
 * `FinalExpHom` (free for the canonical `finalExpPow`)
@@ -530,7 +496,7 @@ What is proved here, no axioms, no sorries:
 * `atePairing_left_linear_pow` / `_right_linear_pow`: bilinearity under
   the canonical final-exp follows.
 * `instAteBilinear_from_recurrence`: the full audit-chain combination is
-  a typeclass instance, automatically inferred from the four classes.
+  a typeclass instance, automatically inferred from the three classes.
 -/
 
 end PairingBilinear

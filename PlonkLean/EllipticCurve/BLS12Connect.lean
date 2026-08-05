@@ -3,10 +3,10 @@ import PlonkLean.KZG.Concrete.BLS12
 
 /-! # Bridge: concrete BLS12-381 prime fields ↔ axiomatic `BLS12_381_PairingSetup`
 
-With `BLS12Primes.lean` providing `bls12_381_q`, `bls12_381_r` as proven
-primes (and hence `Fq`, `Fr` as honest `Field` instances), we can now
-discharge the `BLS12_381_PairingSetup.scalarField_card` axiom for any
-instance built on `Fr`.
+With `BLS12Primes.lean` providing the values `bls12_381_q`, `bls12_381_r`
+and explicit primality hypothesis classes, we can discharge the
+`BLS12_381_PairingSetup.scalarField_card` field for any instance built on
+`Fr`, conditional on `BLS12_r_Prime`.
 
 This file provides the bridge: given a concrete `PairingSetup Fr` (with
 groups + pairing satisfying the axioms), we get a `BLS12_381_PairingSetup`
@@ -60,14 +60,12 @@ KZG soundness" is:
 3. `BLS12_381_PairingSetup.kzg_complete_BLS12_381` and
    `BLS12_381_PairingSetup.kzg_AGM_soundness_of_tauHardness_BLS12_381`
    give honest KZG completeness + soundness.
-4. `plonk_witness_satisfies_of_quotient_extractor` (via the FS lift) gives
-   end-to-end Plonk soundness.
+4. `plonk_witness_satisfies_of_quotient_extractor` consumes the remaining
+   transcript-to-quotient extraction obligation.
 
-The only remaining axiom auditors check is `TauHardness τ n` (or its
-equivalent q-SDH form via `kzg_soundness_of_qsdhHard`).
-
-The prime fields underlying BLS12-381 are now FULLY VERIFIED as primes —
-`Fact (Nat.Prime bls12_381_q)` and `Fact (Nat.Prime bls12_381_r)` are
-proved by `native_decide`, no axioms. -/
+Remaining proof obligations include `BLS12_r_Prime`, construction of the
+actual curve groups and pairing, fixed-gap root avoidance (or an explicit
+q-SDH adversary reduction), and transcript extraction. The BLS12 prime values
+are concrete, but their primality is not yet proved in this repository. -/
 
 end PlonkLean.EllipticCurve.BLS12

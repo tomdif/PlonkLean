@@ -14,10 +14,9 @@ In flattened indices with `n=3`:
   left input of row 1 = `0·3 + 1 = 1`.
 So `σ` swaps indices 6 and 1; all other indices are fixed.
 
-This file demonstrates the Circuit type compiles and is usable. We do *not*
-prove `Satisfies` here — that depends on the still-`sorry` headline theorem.
-We only verify per-row gate constraints concretely, which proves nothing about
-the polynomial reduction but does sanity-check the arithmetization definitions.
+This file demonstrates the Circuit type compiles and is usable. We verify the
+per-row gate constraints concretely; a future example can additionally package
+the permutation proof into the full `Satisfies` predicate.
 -/
 
 namespace PlonkLean.Tests

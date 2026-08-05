@@ -70,17 +70,16 @@ theorem kzg_AGM_soundness_via_setup (P : PairingSetup F) (τ : F)
   kzg_AGM_soundness P.g₁ P.g₂ τ P.pairing P.nondegenerate p_C q z v
     h_verify h_hardness
 
-/-- Soundness packaged with the named `TauHardness` predicate. -/
+/-- Soundness packaged with root avoidance for the fixed transcript gap. -/
 theorem kzg_AGM_soundness_of_tauHardness_via_setup (P : PairingSetup F) (τ : F)
     (p_C q : Polynomial F) (z v : F)
     (h_verify : kzgVerify P.g₁ P.g₂ (τ • P.g₂) P.pairing
                   (commit (honestSRS τ P.g₁) p_C) z v
                   (commit (honestSRS τ P.g₁) q))
-    (n : ℕ) (h_deg : (soundnessGap p_C q z v).degree ≤ n)
-    (h_tau : TauHardness τ n) :
+    (h_tau : TauHardness τ (soundnessGap p_C q z v)) :
     p_C.eval z = v :=
   kzg_AGM_soundness_of_tauHardness P.g₁ P.g₂ τ P.pairing P.nondegenerate
-    p_C q z v h_verify n h_deg h_tau
+    p_C q z v h_verify h_tau
 
 end PairingSetup
 

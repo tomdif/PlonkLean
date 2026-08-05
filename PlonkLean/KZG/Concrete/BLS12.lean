@@ -68,11 +68,10 @@ theorem kzg_AGM_soundness_of_tauHardness_BLS12_381
                   B.setup.pairing
                   (commit (honestSRS τ B.setup.g₁) p_C) z v
                   (commit (honestSRS τ B.setup.g₁) q))
-    (n : ℕ) (h_deg : (soundnessGap p_C q z v).degree ≤ n)
-    (h_tau : TauHardness τ n) :
+    (h_tau : TauHardness τ (soundnessGap p_C q z v)) :
     p_C.eval z = v :=
   PairingSetup.kzg_AGM_soundness_of_tauHardness_via_setup B.setup τ
-    p_C q z v h_verify n h_deg h_tau
+    p_C q z v h_verify h_tau
 
 end BLS12_381_PairingSetup
 

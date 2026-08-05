@@ -32,6 +32,7 @@ import PlonkLean.KZG.Concrete.BN254
 import PlonkLean.KZG.ExtractedExample
 import PlonkLean.Crypto.FiatShamir
 import PlonkLean.Crypto.QSDH
+import PlonkLean.Crypto.QSDHProbability
 import PlonkLean.Crypto.ZeroKnowledge
 import PlonkLean.Crypto.Simulator
 import PlonkLean.Crypto.Recursive
@@ -41,6 +42,13 @@ import PlonkLean.Refinement.Halo2
 import PlonkLean.Refinement.Plonky2
 import PlonkLean.KZG.Executable
 import PlonkLean.KZG.Probabilistic
+import PlonkLean.Probability.Finite
+import PlonkLean.KZG.FiniteFieldSoundness
+import PlonkLean.KZG.PermutationFiniteField
+import PlonkLean.Crypto.UniformPlonk
+import PlonkLean.Crypto.BytePlonkTranscript
+import PlonkLean.KZG.ByteVerifier
+import PlonkLean.KZG.TranscriptSecurity
 import PlonkLean.Circuits.Gadgets
 import PlonkLean.Circuits.Mux
 import PlonkLean.Circuits.RangeProof

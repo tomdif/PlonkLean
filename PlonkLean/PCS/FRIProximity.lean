@@ -118,34 +118,32 @@ theorem mem_code_closeToCode {d : ℕ} {D : Finset F} {f : D → F}
     (hf : f ∈ ReedSolomonCode F d D) : closeToCode d D f 0 :=
   (closeToCode_zero_iff_codeword d D f).mpr hf
 
-/-! ## The proximity-gap hypothesis (passed-as-Prop)
+/-! ## The proximity-gap hypothesis (counting form)
 
-The actual content is a probability statement: with overwhelming
-probability over the random folding challenge, a function that is far
-from low-degree folds to a function that is also far from low-degree.
-
-We treat it as an opaque `Prop` and let downstream consumers carry it
-as a hypothesis, matching the pattern used for `TauHardness` in the
-KZG layer.
+The actual content is a probability statement: only a small number of
+folding challenges are bad. We record that content directly as a finite-set
+counting bound instead of using a placeholder proposition equal to `True`.
 -/
 
-/-- The proximity-gap hypothesis for parameters `(d, D, δ)`:
-informally, *any* function `f : D → F` that is `δ`-far from the code
-remains `δ`-far after a random fold (with all-but-negligible
-probability).  We package this as a passed-in `Prop`. -/
+/-- A counting-form proximity-gap hypothesis. `Bad α` identifies folding
+challenges where the desired proximity statement fails; at most `B` such
+challenges may occur in the candidate challenge set `S`. -/
 def ProximityGapHypothesis
     (F : Type u) [Field F] [DecidableEq F]
-    (_d : ℕ) (_D : Finset F) (_δ : ℕ) : Prop :=
-  True
+    (_d : ℕ) (_D : Finset F) (_δ : ℕ)
+    (B : ℕ) (Bad : F → Prop) [DecidablePred Bad]
+    (S : Finset F) : Prop :=
+  (S.filter Bad).card ≤ B
 
-/-- The proximity-gap hypothesis is trivially provable in this
-abstract form — its real cryptographic content is in instantiation
-parameters and probability, which is out of scope. -/
-theorem proximityGapHypothesis_holds
+/-- The always-valid baseline bound. Useful bounds must make `B` much smaller
+than `S.card`; BCIKS supplies that non-trivial strengthening. -/
+theorem proximityGapHypothesis_trivialBound
     (F : Type u) [Field F] [DecidableEq F]
-    (d : ℕ) (D : Finset F) (δ : ℕ) :
-    ProximityGapHypothesis F d D δ :=
-  trivial
+    (d : ℕ) (D : Finset F) (δ : ℕ)
+    (Bad : F → Prop) [DecidablePred Bad] (S : Finset F) :
+    ProximityGapHypothesis F d D δ S.card Bad S := by
+  unfold ProximityGapHypothesis
+  exact Finset.card_filter_le _ _
 
 /-! ## Conditional FRI soundness
 
@@ -178,10 +176,12 @@ theorem FRISoundness
     {F : Type u} [Field F] [DecidableEq F]
     (d : ℕ) (D : Finset F) (δ : ℕ) {n : ℕ}
     (V : FRIVerifier F D n)
+    (B : ℕ) (Bad : F → Prop) [DecidablePred Bad] (S : Finset F)
     (witness : ∀ (f : D → F) (π : FRIProof F n),
       V f π →
-        closeToCode d D f δ ∨ ¬ ProximityGapHypothesis F d D δ)
-    (hPG : ProximityGapHypothesis F d D δ)
+        closeToCode d D f δ ∨
+          ¬ ProximityGapHypothesis F d D δ B Bad S)
+    (hPG : ProximityGapHypothesis F d D δ B Bad S)
     (f : D → F) (π : FRIProof F n) (hAccept : V f π) :
     closeToCode d D f δ := by
   rcases witness f π hAccept with hclose | hbad

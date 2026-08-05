@@ -148,7 +148,7 @@ theorem batch_AGM_soundness {k : ℕ}
   exact kzg_AGM_soundness g₁ g₂ τ e h_nondeg
     (combinedPoly αs ps) q z (batchValue αs vs) h_verify h_hardness
 
-/-- Soundness packaged with the `TauHardness` predicate. -/
+/-- Soundness packaged with root avoidance for the fixed combined gap. -/
 theorem batch_AGM_soundness_of_tauHardness {k : ℕ}
     [Module.IsTorsionFree F G_T]
     (g₁ : G₁) (g₂ : G₂) (τ : F)
@@ -159,11 +159,9 @@ theorem batch_AGM_soundness_of_tauHardness {k : ℕ}
     (h_verify : batchVerify g₁ g₂ (τ • g₂) e
                   αs (fun i => commit (honestSRS τ g₁) (ps i))
                   vs z (commit (honestSRS τ g₁) q))
-    (n : ℕ)
-    (h_deg : (soundnessGap (combinedPoly αs ps) q z (batchValue αs vs)).degree ≤ n)
-    (h_tau : TauHardness τ n) :
+    (h_tau : TauHardness τ
+      (soundnessGap (combinedPoly αs ps) q z (batchValue αs vs))) :
     (combinedPoly αs ps).eval z = batchValue αs vs :=
-  batch_AGM_soundness g₁ g₂ τ e h_nondeg αs ps vs z q h_verify
-    (fun h => h_tau _ h_deg h)
+  batch_AGM_soundness g₁ g₂ τ e h_nondeg αs ps vs z q h_verify h_tau
 
 end PlonkLean.KZG

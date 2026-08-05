@@ -27,13 +27,22 @@ theorem schwartzZippel_univariate
   have h_nat : R.natDegree ≤ n := natDegree_le_of_degree_le h_deg
   exact h_card.trans h_nat
 
-/-- For a fixed non-zero polynomial of degree ≤ n, count of τ that violate
-`TauHardness` (for this specific polynomial) is at most `n`. -/
+/-- For a fixed non-zero polynomial of degree ≤ n, the number of setup
+values that violate `TauHardness τ R` is at most `n`. This is the precise
+finite-field justification for scoping hardness to an adversary-produced
+polynomial rather than quantifying over every polynomial simultaneously. -/
 theorem fixed_poly_hardness_prob
     {F : Type*} [Field F] [DecidableEq F] [Fintype F]
     (n : ℕ) (R : F[X]) (h_ne : R ≠ 0) (h_deg : R.degree ≤ n) :
     (Finset.univ.filter (fun τ : F => R.eval τ = 0)).card ≤ n :=
   schwartzZippel_univariate n R h_ne h_deg
+
+/-- For a non-zero fixed polynomial, failure of `TauHardness τ R` is
+exactly the root event counted by `fixed_poly_hardness_prob`. -/
+theorem not_tauHardness_iff
+    {F : Type*} [Field F] (R : F[X]) (h_ne : R ≠ 0) (τ : F) :
+    ¬ TauHardness τ R ↔ R.eval τ = 0 := by
+  simp [TauHardness, h_ne]
 
 /-- **Per-adversary probabilistic soundness.** For a fixed adversarial
 transcript whose soundness-gap polynomial is non-zero with degree ≤ n,

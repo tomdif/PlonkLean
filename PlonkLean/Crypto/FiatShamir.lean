@@ -1,4 +1,4 @@
-import PlonkLean.KZG.PlonkBridge
+import Mathlib.Algebra.Polynomial.Eval.Defs
 
 /-! # Fiat-Shamir Abstraction (TIER 1)
 
@@ -7,8 +7,12 @@ non-interactive one by replacing fresh-random challenges with a hash of the
 prior transcript. This is the production transformation used by every
 deployed zk-SNARK.
 
-In the Random Oracle Model, the hash function H is idealized to a uniformly
-random function. We model this as a passed-in hardness predicate.
+In the Random Oracle Model, the hash function `H` is idealized to a uniformly
+random function. Security is necessarily scoped to a fixed polynomial
+produced before its challenge is known. Quantifying over every polynomial
+after revealing the challenge would be inconsistent (`X - C challenge` is an
+immediate counterexample), so the interface below names the exact collision
+event for one transcript polynomial.
 -/
 
 namespace PlonkLean.Crypto
@@ -51,9 +55,12 @@ def derivePlonkChallenges (H : RandomOracle F) (prelude : Transcript F) :
   let ζ  := deriveChallenge H T₃
   { β := β, γ := γ, α := α, ζ := ζ }
 
-/-- Random-oracle hardness, analog of `TauHardness`. -/
-def RandomOracleHardness (H : RandomOracle F) (T : Transcript F) (n : ℕ) : Prop :=
-  ∀ R : F[X], R.degree ≤ n → R.eval (deriveChallenge H T) = 0 → R = 0
+/-- The fixed polynomial `R` does not have an unexpected root at the challenge
+derived from transcript `T`. A probability layer justifies this condition
+when `R` is fixed independently of the random-oracle response. -/
+def RandomOracleHardness
+    (H : RandomOracle F) (T : Transcript F) (R : F[X]) : Prop :=
+  R.eval (deriveChallenge H T) = 0 → R = 0
 
 abbrev InteractivePredicate (F : Type*) [Field F] := PlonkChallenges F → Prop
 
@@ -78,9 +85,8 @@ theorem derivePlonkChallenges_deterministic
 theorem fiatShamir_lift_soundness
     (H : RandomOracle F) (prelude : Transcript F)
     (P : InteractivePredicate F)
-    (R : F[X]) (n : ℕ)
-    (h_R_deg : R.degree ≤ n)
-    (h_hardness : RandomOracleHardness H prelude n)
+    (R : F[X])
+    (h_hardness : RandomOracleHardness H prelude R)
     (h_sound : ∀ ch : PlonkChallenges F,
         ch.β = deriveChallenge H prelude →
         (R = 0 ∨ R.eval ch.β ≠ 0) →
@@ -92,32 +98,8 @@ theorem fiatShamir_lift_soundness
     by_cases hR : R = 0
     · exact Or.inl hR
     · refine Or.inr (fun heval => hR ?_)
-      exact h_hardness R h_R_deg (h_β ▸ heval)
+      exact h_hardness (h_β ▸ heval)
   exact h_sound ch h_β h_disj
-
-open PlonkLean PlonkLean.KZG PlonkLean.Permutation in
-/-- **Plonk + Fiat-Shamir, completeness side.** -/
-theorem plonk_FS_completeness
-    {n : ℕ}
-    [Infinite F]
-    (D : PlonkLean.EvaluationDomain F n) (hn : 0 < n) (h2 : (2 : F) ≠ 0)
-    (Cs : PlonkLean.Arithmetization.Circuit F n)
-    (w : PlonkLean.Arithmetization.Witness F n)
-    (k1 k2 : F)
-    (h_idValue_inj : Function.Injective (idValue D k1 k2))
-    (h_idValue_nonzero : ∀ i : Fin (3 * n), idValue D k1 k2 i ≠ 0)
-    (h_no_lookup : Cs.lookup = none)
-    (h_exists_random : ∃ β₀ γ₀ : F, β₀ ≠ 0 ∧ γ₀ ≠ 0 ∧
-      ∀ i : Fin n, denom D Cs.sigma w β₀ γ₀ k1 k2 i ≠ 0)
-    (_H : RandomOracle F) (_prelude : Transcript F)
-    (h_quotient_extractor : ∀ β γ : F, β ≠ 0 → γ ≠ 0 →
-        (∀ i : Fin n, denom D Cs.sigma w β γ k1 k2 i ≠ 0) →
-        ∀ α : F, ∃ t : Polynomial F,
-          masterIdentity D Cs w β γ k1 k2 α = t * Poly.vanishingPoly F n) :
-    Cs.Satisfies w :=
-  plonk_witness_satisfies_of_quotient_extractor D hn h2 Cs w k1 k2
-    h_idValue_inj h_idValue_nonzero h_no_lookup h_exists_random
-    h_quotient_extractor
 
 @[simp]
 theorem length_extendTranscript (H : RandomOracle F) (T : Transcript F) :

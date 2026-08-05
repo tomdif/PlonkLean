@@ -7,9 +7,9 @@ set_option linter.unusedSectionVars false
 
 /-! # FRI proximity bounds — concrete probabilistic shadow
 
-This file STRENGTHENS the placeholder `ProximityGapHypothesis` from
-`PlonkLean.PCS.FRIProximity` (which is currently `True`) by introducing a
-**concrete counting predicate** that captures the *probabilistic shadow* of
+This file develops the counting-form `ProximityGapHypothesis` from
+`PlonkLean.PCS.FRIProximity` with a convenient alias and the structural
+lemmas needed for the *probabilistic shadow* of
 the Ben-Sasson–Carmon–Ishai–Kopparty–Saraf (BCIKS) proximity-gap theorem
 (FOCS 2020):
 
@@ -117,8 +117,8 @@ theorem hammingDist_codewords_le_card
 
 /-! ## §2.  The strengthened proximity-gap bound
 
-We replace the placeholder `ProximityGapHypothesis = True` with a
-**counting** predicate: there are at most `B` "bad" folding challenges.
+We specialize the core counting predicate: there are at most `B` "bad"
+folding challenges.
 -/
 
 /-- A *folding challenge* in this abstract development is just an element
@@ -152,7 +152,7 @@ def ProximityGapBound
     (_d : ℕ) (_D : Finset F) (_δ : ℕ)
     (B : ℕ) (Bad : F → Prop) [DecidablePred Bad]
     (S : Finset F) : Prop :=
-  (S.filter Bad).card ≤ B
+  ProximityGapHypothesis F _d _D _δ B Bad S
 
 /-- The trivial bound: there are at most `S.card` bad challenges in `S`. -/
 theorem proximityGapBound_trivial
@@ -268,18 +268,16 @@ theorem FRISoundness_counting
 
 /-! ## §5.  Bridge to `ProximityGapHypothesis`
 
-Show that the counting bound `ProximityGapBound` *implies* the abstract
-`ProximityGapHypothesis` of `PlonkLean.PCS.FRIProximity`. (The latter is
-currently `True`, so any predicate trivially implies it; we record the
-implication explicitly so the auditor can see the direction of
-strengthening.)
+Show that the convenience predicate `ProximityGapBound` is exactly the core
+counting-form `ProximityGapHypothesis` of `PlonkLean.PCS.FRIProximity`.
 -/
 
 theorem proximityGapBound_implies_hypothesis
     (d : ℕ) (D : Finset F) (δ : ℕ)
     (B : ℕ) (Bad : F → Prop) [DecidablePred Bad] (S : Finset F)
-    (_h : ProximityGapBound F d D δ B Bad S) :
-    ProximityGapHypothesis F d D δ := trivial
+    (h : ProximityGapBound F d D δ B Bad S) :
+    ProximityGapHypothesis F d D δ B Bad S :=
+  h
 
 /-! ## §6.  Sanity checks -/
 
@@ -288,7 +286,7 @@ theorem proximityGapBound_empty
     (d : ℕ) (D : Finset F) (δ : ℕ)
     (Bad : F → Prop) [DecidablePred Bad] :
     ProximityGapBound F d D δ 0 Bad (∅ : Finset F) := by
-  unfold ProximityGapBound
+  unfold ProximityGapBound ProximityGapHypothesis
   simp
 
 /-- The triangle inequality is tight on the diagonal: `f = g = h`. -/

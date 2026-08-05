@@ -13,6 +13,10 @@ namespace PlonkLean.Tests.Examples
 
 open PlonkLean.Arithmetization PlonkLean.Circuits
 
+/-- Make the concrete primality evidence required by the `ZMod` field
+instance explicit, so this file is checked by the default test target. -/
+local instance : Fact (Nat.Prime 7) := ⟨by decide⟩
+
 /-! ### 1. Addition example. -/
 
 def addWitness : Witness ℚ 1 where

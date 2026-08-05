@@ -1,30 +1,139 @@
 # PlonkLean
 
 A Lean 4 + Mathlib formalization of the [Plonk](https://eprint.iacr.org/2019/953.pdf)
-zk-SNARK protocol stack — arithmetization, permutation argument, lookup arguments,
-KZG polynomial commitments, FRI/STARK proximity-gap path, BLS12-381 instantiation —
-chained end-to-end with **0 `sorry`s and 0 new `axiom` declarations**.
+zk-SNARK algebraic stack: arithmetization, permutation and lookup arguments,
+KZG commitments, FRI proximity scaffolding, and a conditional BLS12-381 tower.
+The project builds with **0 proof holes and 0 new `axiom` declarations**.
 
-Cryptographic assumptions are exposed as named, auditable Lean typeclasses
-(`TauHardness`, `BLS12_q_Prime`, `BCIKSCombinatorialEstimate`, `MillerRecurrence`,
-…) instead of being asserted as `axiom`s. An auditor's job is to inspect this
-small bounded list and decide whether they accept each one.
+Cryptographic boundaries are explicit theorem parameters or structures. In
+particular, KZG now proves an unconditional **binding-or-root-collision**
+theorem and scopes q-SDH to an explicit adversary plus reduction. This avoids
+the inconsistent shortcut of quantifying over every polynomial after `τ` is
+known.
 
 | | |
 |---|---|
-| Files | 76 `.lean` modules |
-| Build | `lake build` → **2759 jobs, 0 errors** |
+| Files | 92 `.lean` modules |
+| Build | `lake build` → **3095 jobs, 0 errors** |
 | `sorry` count | **0** |
 | New `axiom` declarations | **0** |
 | Lean toolchain | Lean 4 + Mathlib master (see `lean-toolchain`) |
 
 ## What is verified
 
-### End-to-end Plonk soundness
+### Conditional bridge to Plonk witness satisfaction
 `plonk_witness_satisfies_of_quotient_extractor` (via `KZG/PlonkBridge.lean` and the
 Schwartz–Zippel lift) chains: an extractor that produces a quotient polynomial from
 the verifier transcript ⇒ the witness satisfies the Plonk constraint system. This
-collapses the SNARK soundness story to: KZG soundness ⇒ Plonk soundness.
+isolates the remaining protocol proof obligation; the extractor hypothesis is not
+yet derived from one concrete production transcript/verifier.
+
+### Finite-field challenge soundness
+`KZG/FiniteFieldSoundness.lean` and `KZG/PermutationFiniteField.lean` provide
+deployment-oriented counting theorems without `[Infinite F]`:
+
+- `quotientCheckAt_bad_zeta_count` — a fixed non-zero quotient gap of degree
+  `d` passes at no more than `d` evaluation challenges;
+- `quotientIdentity_bad_alpha_count` — if one Plonk component identity fails
+  at a row, no more than two separator challenges can hide it;
+- `quotientCheck_bad_alpha_zeta_count` — a prover may choose its quotient
+  after `α` but before `ζ`; accepted pairs are bounded by
+  `2·|F| + |F|·d`;
+- `unsatisfied_of_copyConstraints_bad_alpha_zeta_count` — the same bound is
+  connected to circuit-level non-satisfaction for no-lookup witnesses whose
+  copy constraints hold;
+- `permutationBadBetaGammaPairs_card_le` — if copy constraints fail, the
+  exceptional permutation challenges are bounded by
+  `(6n)²·|F| + |F|·6n`;
+- `unsatisfied_bad_four_challenge_count` — for any unsatisfied no-lookup
+  witness, the accepting `(β, γ, α, ζ)` tuples are bounded by
+  `|F|³·((6n)² + 6n + 2 + d)`, assuming distinct wire identifiers and
+  a degree-`d` quotient gap.
+
+For four independent uniform challenges, the last cardinality result gives
+the algebraic false-acceptance bound `((6n)² + 6n + 2 + d) / |F|`. The
+theorem preserves protocol order: the quotient may depend on `β`, `γ`, and
+`α`, but is fixed before `ζ`.
+
+### Uniform probability and adaptive byte-level Fiat–Shamir
+`Crypto/UniformPlonk.lean` lifts the counting theorem into Mathlib's genuine
+`PMF` and `ENNReal` probability framework:
+
+- `uniformPlonkChallengePMF_apply` proves that every four-challenge tuple has
+  mass `|F|⁻⁴`;
+- `unsatisfied_plonk_uniform_false_acceptance_probability_le_one_div` proves
+  the bound `((6n)² + 6n + 2 + d) / |F|` as a probability inequality;
+- `derivePlonkChallenges_fourQueryPlonkOracle` constructs a finite oracle tape
+  and proves that the existing Fiat–Shamir API recovers its four answers;
+- `unsatisfied_fourQueryFiatShamir_false_acceptance_probability_le_one_div`
+  transfers the same bound to that four-query Fiat–Shamir experiment.
+
+`Crypto/BytePlonkTranscript.lean` then fixes a byte-level protocol schedule:
+
+- witness commitments precede `β` and `γ`;
+- the permutation commitment may depend on `(β, γ)` and precedes `α`;
+- quotient commitments and their bound polynomial may depend on
+  `(β, γ, α)` and precede `ζ`;
+- evaluations follow all four challenges;
+- challenge domains use distinct reserved bytes, and
+  `bytePlonkQuerySet_card` proves that every resulting path makes exactly four
+  distinct oracle queries;
+- `deriveBytePlonkChallenges_fourQueryBytePlonkOracle` proves that the
+  programmed adaptive byte oracle recovers its intended challenges.
+
+The explicit `BytePlonkPCSExtractionSound` refinement connects acceptance of
+the final byte transcript to the algebraic quotient check.
+`unsatisfied_bytePlonkPCS_false_acceptance_probability_le` proves that any
+verifier satisfying this refinement inherits the bound
+`((6n)² + 6n + 2 + d) / |F|`.
+
+`KZG/ByteVerifier.lean` now instantiates that refinement with a canonical
+two-opening KZG verifier:
+
+- `FixedWidthByteCodec` pins component widths and requires canonical
+  encode/decode round trips;
+- `decodePlonkKZGOpeningPacket_encode` proves exact packet round trips, while
+  `decodePlonkKZGOpeningPacket_encode_append_ne_nil` proves trailing bytes are
+  rejected;
+- the packet wire order is master value, quotient value, master opening proof,
+  quotient opening proof;
+- `plonkKZGPacketVerifyWithKeyBool` checks two executable KZG pairing equations
+  and the scalar quotient equation using only public SRS material and
+  transcript-derived commitments—not the witness;
+- `parsedPlonkKZGByteVerifier_extractionSound` derives
+  `BytePlonkPCSExtractionSound` from the explicit `PlonkKZGAGMSecurity`
+  interface;
+- `unsatisfied_parsedPlonkKZGByteVerifier_probability_le` transfers the full
+  finite-field probability bound directly to this parser and Bool verifier.
+
+`KZG/TranscriptSecurity.lean` removes the remaining out-of-band commitment
+source from the headline path:
+
+- the three witness commitments, permutation commitment, and quotient
+  commitment are decoded from their actual earlier prover-message payloads;
+- `PlonkKZGLinearization` is the public algorithm that derives the master
+  commitment from those five points and the challenges;
+- `fullyParsedPlonkKZGByteVerifier_extractionSound_of_qsdh` proves extraction
+  from explicit AGM representations plus two concrete `QSDHAdversary` /
+  `QSDHReduction` pairs—there is no free `TauHardness` premise;
+- `Crypto/QSDHCost.lean` gives adversaries fuel-bounded small-step machine
+  semantics;
+- `unsatisfied_fullyParsedPlonkKZG_probability_le_of_bounded_qsdh` carries
+  separate certified transition budgets for the master and quotient
+  reductions into the full Plonk probability theorem.
+
+This closes the byte-schedule and adaptive query-counting step. It does not
+yet instantiate production field/group codecs or a concrete pairing, derive
+the deployed linearization formula, supply a concrete AGM extractor and q-SDH
+reduction, refine each abstract machine step to implementation cost, or model a
+uniformly sampled random function.
+
+`Crypto/QSDHProbability.lean` supplies the parallel randomized q-SDH layer:
+setup randomness and explicit adversary coins are caller-supplied `PMF`s,
+`randomizedQSDHAdvantage` is the exact break probability, and
+`randomizedRootCollisionAdvantage_le_of_qsdhSecure` proves that a pointwise AGM
+reduction transfers any q-SDH advantage bound to the root-collision event.
+Runtime/PPT certification remains deliberately separate.
 
 ### Plonk arithmetization
 `Identity.lean` — the master identity theorem: a witness satisfies the constraint
@@ -32,15 +141,24 @@ system iff `master(X) = t(X) · Z_H(X)` for some quotient `t`, for every challen
 `(β, γ, α)`. Full permutation argument decomposed into four sub-lemmas
 (`Permutation/*.lean`).
 
-### KZG (Phases 0–4 + extras)
+### KZG (Phases 0–4 + security boundary)
 - `Foundations.lean` — `commit_eq_eval_smul` (committing equals evaluating in the exponent)
 - `Correctness.lean` — completeness: honest openings always verify
-- `Soundness.lean` — AGM soundness under `TauHardness τ n`
+- `Soundness.lean` — unconditional `binding ∨ RootCollision`, fixed-gap
+  `TauHardness τ R`, and explicit adversary-family scoping
 - `Batch.lean` — batched openings via linearity
 - `PlonkBridge.lean` — connecting KZG soundness to Plonk arithmetization
 - `SchwartzZippel.lean` — pointwise → polynomial lift
 - `Probabilistic.lean` — Schwartz–Zippel counting bound
+- `FiniteFieldSoundness.lean` — exact union/fiber bounds and counted Plonk
+  `α`/`ζ` false-acceptance theorems
+- `PermutationFiniteField.lean` — counted `β`/`γ` permutation soundness and
+  the composed four-challenge Plonk bound
 - `Executable.lean` — `Bool`-valued verifier with `Decidable` instances
+- `ByteVerifier.lean` — canonical proof-packet parser, two-opening Bool
+  verifier, AGM extraction bridge, and inherited Plonk probability bound
+- `TranscriptSecurity.lean` — parsing of all commitment frames, public
+  linearization, explicit q-SDH reductions, and bounded-machine theorem
 - `Concrete/Curve.lean`, `Concrete/BLS12.lean`, `Concrete/BN254.lean` — bundled `PairingSetup`
 
 ### Lookup arguments
@@ -56,7 +174,7 @@ system iff `master(X) = t(X) · Z_H(X)` for some quotient `t`, for every challen
   obstruction bound; isolates the deep weight-distribution step into a single named
   hypothesis class `BCIKSCombinatorialEstimate`
 
-### BLS12-381 instantiation
+### Conditional BLS12-381 tower and pairing scaffold
 - `EllipticCurve/BLS12Primes.lean` — `bls12_381_q` (381-bit), `bls12_381_r` (255-bit) under
   Pratt-cert hypothesis classes `BLS12_q_Prime`, `BLS12_r_Prime`
 - `EllipticCurve/BLS12Curve.lean` — `E_q : y² = x³ + 4`
@@ -70,8 +188,8 @@ system iff `master(X) = t(X) · Z_H(X)` for some quotient `t`, for every challen
   `LineFunction`, `MillerStateType`, `FinalExponentiationSpec`)
 - `Future/GTGroup.lean` — `G_T = μ_r ⊆ F_{q^12}^×` with `CommGroup` and `SMul Fr` action
 - `Future/PairingBilinear.lean` — `atePairing = finalExp ∘ millerLoop`; bilinearity
-  decomposed into `MillerLineDivisorAxiom`, `MillerRecurrence`, `NonDegenerateAtePairing`
-  hypothesis classes; `finalExpPow` proven multiplicative directly
+  decomposed into `MillerRecurrence` and `NonDegenerateAtePairing` hypothesis
+  classes; `finalExpPow` proven multiplicative directly
 
 ### Concrete decide-verified curve
 - `EllipticCurve/SmallCurve.lean`, `SmallGroup.lean` — twisted Edwards curve
@@ -93,37 +211,50 @@ contract.
 A real Halo2/Plonky2/arkworks verifier inherits the soundness theorem by
 proving it satisfies the matching refinement signature.
 
-### Zero-knowledge
-`Future/KZGBlindingZK.lean` — `zhBlindingStrategy`, `zhBlinding_perfectHVZK` (perfect
-honest-verifier zero-knowledge for the standard Z_H-blinding strategy).
+### Zero-knowledge interface
+`Future/KZGBlindingZK.lean` — `zhBlindingStrategy` and conditional perfect-HVZK
+theorems under an explicit `Faithful` transcript-matching witness.
 
 ### Fiat–Shamir / recursion / cryptographic glue
-`Crypto/FiatShamir.lean`, `Crypto/QSDH.lean`, `Crypto/ZeroKnowledge.lean`,
+`Crypto/FiatShamir.lean`, `Crypto/UniformPlonk.lean`,
+`Crypto/BytePlonkTranscript.lean`, `Crypto/QSDH.lean`,
+`Crypto/QSDHCost.lean`,
+`Crypto/QSDHProbability.lean`, `Crypto/ZeroKnowledge.lean`,
 `Crypto/Simulator.lean`, `Crypto/Recursive.lean`, `Crypto/RecursiveVerifier.lean`.
 
-## Cryptographic assumption surface
+## Security and assumption surface
 
-The complete list of typeclasses an auditor must check. **Every one is named,
-documented, and bounded.** Nothing else outside Mathlib is assumed.
+The main conditional interfaces an auditor must inspect are named below.
+Structures such as `PairingSetup` also carry algebraic laws explicitly; a
+concrete deployment must construct those structures rather than merely assume
+their existence.
 
 | Hypothesis class | What it asserts | How to discharge |
 |---|---|---|
-| `TauHardness τ n` | q-SDH / q-DLog hardness at SRS degree `n` | Cryptographic assumption |
+| `TauHardness τ R` | Fixed adversary polynomial `R` has no unexpected root at `τ` | Finite-field bound or reduction |
+| `QSDHHard q g₁ τ adv` | Explicit adversary does not win from the public q-SDH powers | Computational assumption |
+| `RandomizedQSDHSecureUpTo … ε` | Explicit setup/coin PMFs give adversary advantage at most `ε` | Computational assumption plus cost model |
+| `QSDHReduction … R` | A root collision for `R` yields a win by that adversary | Security reduction |
+| `BytePlonkPCSExtractionSound …` | Accepting final byte transcripts imply the algebraic quotient check | Refine a pinned parser and concrete PCS verifier |
+| `PlonkKZGAGMSecurity …` | Transcript commitments/proofs have AGM polynomial representations and their two gaps avoid `τ` | AGM extractor plus q-SDH reduction and cost model |
+| `FullyParsedPlonkKZGAGM …` | Parsed commitments and accepted proofs have the required polynomial representations | Concrete AGM extractor and linearization proof |
+| `FullyParsedPlonkKZGQSDHSecurity …` | Both exact soundness gaps reduce to explicit q-SDH adversaries | Two q-SDH reductions |
+| `FullyParsedPlonkKZGBoundedQSDHSecurity …` | Those adversaries run under explicit transition budgets | Refine abstract steps to concrete implementation cost |
 | `BLS12_q_Prime` | `bls12_381_q` is prime (381-bit) | Pratt certificate (Mathlib `lucas_primality`) |
 | `BLS12_r_Prime` | `bls12_381_r` is prime (255-bit) | Pratt certificate |
 | `Fq2_NonResidue` | −1 is a non-square in `F_q` | `q ≡ 3 (mod 4)` |
 | `Fq6_NonResidue` | `1+u` is a cubic non-residue in `F_{q²}` | Numerical check |
 | `Fq12_NonResidue` | `v` is a non-square in `F_{q⁶}` | Numerical check |
 | `WeierstrassChordClosure` | Chord-tangent law closes on `E_q` | Algebraic identity |
-| `MillerLineDivisorAxiom` | `div(ℓ_{P,P'}) = (P)+(P')+(-(P+P'))−3·∞` | Weil divisor theory |
 | `MillerRecurrence` | `f_{a+b,P} = f_{a,P}·f_{b,P}·(line/vert)` | Weil reciprocity |
 | `NonDegenerateAtePairing` | Optimal Ate pairing is non-degenerate | Weil reciprocity |
 | `BCIKSCombinatorialEstimate` | Optimal RS proximity gap (the deep tail estimate) | BCIKS 2020 paper |
-| `Faithful` (Fiat–Shamir) | Random-oracle indifferentiability | Hash-function assumption |
+| `RandomOracleHardness H T R` | Fixed transcript polynomial avoids the derived challenge | ROM/probability layer |
+| `Faithful` (ZK simulator) | Pointwise transcript matching after reparameterization | Distributional proof obligation |
 
-The discipline: any new gap in the formalization is exposed as a class, never
-asserted as a Lean `axiom`. This means the build report is the audit report —
-no hidden assumptions can sneak in.
+The build checks that every conclusion follows from its declared inputs. It
+does not prove the cryptographic assumptions, the BLS primes, the concrete
+pairing, the BCIKS estimate, or simulator faithfulness.
 
 ## Repo layout
 
@@ -163,16 +294,17 @@ PlonkLean/
 ## Use cases
 
 ### 1. Audit deliverable
-A zk-rollup or zkVM team can cite this repo as their soundness reference:
-"our verifier refines this Lean spec; soundness reduces to this list of
-hypothesis classes; auditors verify each one externally."
+A zk-rollup or zkVM team can use the definitions and conditional theorems as
+an audit checklist. Claiming implementation soundness additionally requires a
+proved refinement, transcript extraction, and discharged security interfaces.
 
 ### 2. Refinement target
-Any production verifier — Halo2, Plonky2, arkworks — proves it matches the
-matching refinement signature and inherits end-to-end soundness:
+The intended path for a production Halo2, Plonky2, or arkworks verifier is:
 ```
 Implementation ⊆ Refinement layer ⊆ Verified Plonk spec ⊆ Cryptographic assumptions
 ```
+The repository defines the refinement targets; it does not yet connect a
+pinned production implementation.
 
 ### 3. Gadget library
 Each gadget in `Circuits/` is verified against its functional contract; reuse
@@ -189,7 +321,7 @@ target for Mathlib's `norm_num` extension).
 lake build
 ```
 
-Expected: `Build completed successfully (2759 jobs).` Lean toolchain pinned in
+Expected: `Build completed successfully (3095 jobs).` Lean toolchain pinned in
 `lean-toolchain`.
 
 ## What this is NOT (yet)
@@ -204,16 +336,34 @@ Expected: `Build completed successfully (2759 jobs).` Lean toolchain pinned in
   random oracles, and the BCIKS combinatorial tail estimate are external.
 - **No connected production verifier yet.** The refinement layers are scaffolds;
   matching them to a real Halo2 / Plonky2 / arkworks build is itself a project.
+- **Not yet an end-to-end probabilistic Plonk security theorem.** The complete
+  no-lookup uniform challenge experiment, adaptive byte transcript schedule,
+  exact four-query bound, canonical KZG packet parser/Bool verifier, and
+  conditional PCS-to-algebraic probability lift are proved. All earlier
+  commitment payloads are parsed and the q-SDH reductions support explicit
+  machine budgets. Production codecs, the concrete linearization/AGM proof, a
+  concrete pairing/q-SDH instantiation, random-function game, primitive-step
+  cost refinement, and implementation refinement remain explicit boundaries.
 
 ## What's left (multi-month each)
 
 - Full Pratt certificate proof for the 381-bit `bls12_381_q` (currently a
   hypothesis class; Mathlib's `norm_num.Pratt` extension would close it).
 - Full BCIKS combinatorial tail-estimate proof (currently `BCIKSCombinatorialEstimate`).
-- Weil divisor theory in Lean to discharge `MillerLineDivisorAxiom`,
-  `MillerRecurrence`, `NonDegenerateAtePairing`.
+- Weil divisor theory in Lean to derive `MillerRecurrence` and
+  `NonDegenerateAtePairing`.
 - Connection to a specific production verifier — pick a target, prove it
   refines the spec.
+- Instantiate the fixed-width codecs, public linearization algorithm, and
+  `FullyParsedPlonkKZGAGM` representations for a concrete curve/verifier.
+- Supply the two bounded q-SDH machines and prove their concrete reductions
+  and primitive-step cost refinement.
+- Connect the certified four-query byte schedule to a random-function game and
+  formal advantage composition.
+- Add formal runtime/query-cost semantics and instantiate the randomized q-SDH
+  advantage assumption for a standard computational model.
+- Extend the four-challenge theorem to the repository's lookup relations and
+  tighten the deliberately conservative permutation bound.
 
 ## License
 

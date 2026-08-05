@@ -18,8 +18,9 @@ Audience: zero-knowledge protocol implementers, audit firms, and formal-verifica
   2. KZG polynomial commitment (foundations, completeness, soundness, batching).
   3. The bridge connecting them.
   
-  Total: ~3,000 lines of Lean, 0 sorries, 0 new axioms beyond a single named
-  cryptographic hardness predicate (`TauHardness`, of q-DLog/q-SDH flavor).
+  Total: ~14,000 lines of Lean, 0 proof holes, and 0 new axiom declarations.
+  Cryptographic boundaries are explicit fixed-transcript predicates,
+  adversary interfaces, and reductions.
 
 ## 2. Background (~2 pages)
 
@@ -46,12 +47,18 @@ Audience: zero-knowledge protocol implementers, audit firms, and formal-verifica
   - AGM soundness (Phase 2): bilinearity manipulation + scalar cancellation
     via `Module.IsTorsionFree`.
 
-## 4. The single cryptographic axiom (~1 page)
+## 4. The cryptographic boundary (~1.5 pages)
 
-- `TauHardness τ n := ∀ R : F[X], R.degree ≤ n → R.eval τ = 0 → R = 0`.
-- This is what an auditor reviews. Connection to q-DLog and q-SDH.
-- Probabilistic shadow (Schwartz-Zippel counting bound, formalized in
-  `Probabilistic.lean`).
+- Unconditional theorem: acceptance implies binding or
+  `RootCollision τ (soundnessGap …)`.
+- `TauHardness τ R` is scoped to one fixed adversary-produced polynomial;
+  `AdversaryPolynomialFamily` scopes a bounded family of possible outputs.
+- `QSDHAdversary`, `QSDHHard`, and `QSDHReduction` separate public input,
+  the computational assumption, and the reduction.
+- Explain why the tempting universal predicate over all `R : F[X]` is
+  inconsistent (`X - C τ`) and why adversary/challenge ordering matters.
+- Probabilistic shadow: the fixed-polynomial Schwartz–Zippel counting bound in
+  `Probabilistic.lean`.
 
 ## 5. The bridge theorem (~1 page)
 
